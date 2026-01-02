@@ -1,0 +1,10 @@
+# Example configuration file for ApiaryCD
+# Copy this to config.yaml and customize as needed
+
+http:
+  address: "127.0.0.1:3000"
+  proxy_header: "X-Forwarded-For"
+  proxies: []
+
+example:
+  example: "example"
