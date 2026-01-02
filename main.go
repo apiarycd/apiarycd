@@ -1,6 +1,6 @@
 package main
 
-import "github.com/capcom6/go-project-template/internal"
+import "github.com/apiarycd/apiarycd/internal"
 
 func main() {
 	internal.Run()
