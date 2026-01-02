@@ -17,10 +17,15 @@ type exampleConfig struct {
 	Example string `koanf:"example"`
 }
 
+type storageConfig struct {
+	DataDir string `koanf:"data_dir"`
+}
+
 type Config struct {
 	HTTP http `koanf:"http"`
 
 	Example exampleConfig `koanf:"example"`
+	Storage storageConfig `koanf:"storage"`
 }
 
 func Default() Config {
@@ -33,6 +38,10 @@ func Default() Config {
 
 		Example: exampleConfig{
 			Example: "example",
+		},
+
+		Storage: storageConfig{
+			DataDir: "./data",
 		},
 	}
 }

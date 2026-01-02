@@ -30,14 +30,15 @@ func Run() {
 		// BUSINESS MODULES
 		example.Module(),
 		//
+		// LIFECYCLE MANAGEMENT
 		fx.Invoke(func(lc fx.Lifecycle, logger *zap.Logger) {
 			lc.Append(fx.Hook{
 				OnStart: func(_ context.Context) error {
-					logger.Info("app started")
+					logger.Info("🚀 ApiaryCD application starting up")
 					return nil
 				},
 				OnStop: func(_ context.Context) error {
-					logger.Info("app stopped")
+					logger.Info("🛑 ApiaryCD application shutting down gracefully")
 					return nil
 				},
 			})
