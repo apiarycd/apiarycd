@@ -7,7 +7,9 @@ import (
 	"github.com/apiarycd/apiarycd/internal/deployments"
 	"github.com/apiarycd/apiarycd/internal/server"
 	"github.com/apiarycd/apiarycd/internal/stacks"
+	"github.com/apiarycd/apiarycd/internal/swarm"
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
+	"github.com/apiarycd/apiarycd/pkg/dockerfx"
 	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -19,15 +21,14 @@ func Run() {
 		logger.Module(),
 		logger.WithFxDefaultLogger(),
 		badgerfx.Module(),
-		// goosefx.Module(),
+		dockerfx.Module(),
 		// bunfx.Module(),
 		// fiberfx.Module(),
 		//
 		// APP MODULES
 		config.Module(),
-		// db.Module(),
 		server.Module(),
-		// bot.Module(),
+		swarm.Module(),
 		//
 		// BUSINESS MODULES
 		stacks.Module(),
