@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/apiarycd/apiarycd/internal/config"
-	"github.com/apiarycd/apiarycd/internal/example"
+	"github.com/apiarycd/apiarycd/internal/deployments"
 	"github.com/apiarycd/apiarycd/internal/server"
+	"github.com/apiarycd/apiarycd/internal/stacks"
+	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -16,7 +18,7 @@ func Run() {
 		// CORE MODULES
 		logger.Module(),
 		logger.WithFxDefaultLogger(),
-		// sqlfx.Module(),
+		badgerfx.Module(),
 		// goosefx.Module(),
 		// bunfx.Module(),
 		// fiberfx.Module(),
@@ -28,7 +30,8 @@ func Run() {
 		// bot.Module(),
 		//
 		// BUSINESS MODULES
-		example.Module(),
+		stacks.Module(),
+		deployments.Module(),
 		//
 		// LIFECYCLE MANAGEMENT
 		fx.Invoke(func(lc fx.Lifecycle, logger *zap.Logger) {
