@@ -42,6 +42,10 @@ type stackModel struct {
 }
 
 func newStackModel(stack *StackDraft) *stackModel {
+	if stack == nil {
+		return nil
+	}
+
 	return &stackModel{
 		BaseEntity: storage.BaseEntity{
 			ID:        uuid.New(),
@@ -63,6 +67,10 @@ func newStackModel(stack *StackDraft) *stackModel {
 }
 
 func newStack(model *stackModel) *Stack {
+	if model == nil {
+		return nil
+	}
+
 	return &Stack{
 		StackDraft: StackDraft{
 			Name:        model.Name,

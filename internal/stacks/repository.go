@@ -78,7 +78,11 @@ func (r *Repository) GetByID(_ context.Context, id uuid.UUID) (*Stack, error) {
 		return err
 	})
 
-	return newStack(stack), err
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stack by ID: %w", err)
+	}
+
+	return newStack(stack), nil
 }
 
 // GetByName retrieves a stack by its name.
@@ -190,8 +194,8 @@ func (r *Repository) DeleteStack(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// ListStacks retrieves stacks based on filter criteria.
-func (r *Repository) ListStacks(_ context.Context) ([]Stack, error) {
+// List retrieves stacks based on filter criteria.
+func (r *Repository) List(_ context.Context) ([]Stack, error) {
 	var stacks []Stack
 
 	err := r.db.View(func(txn *badger.Txn) error {
@@ -218,7 +222,11 @@ func (r *Repository) ListStacks(_ context.Context) ([]Stack, error) {
 		return nil
 	})
 
-	return stacks, fmt.Errorf("failed to list stacks: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list stacks: %w", err)
+	}
+
+	return stacks, nil
 }
 
 func (r *Repository) getByID(txn *badger.Txn, id uuid.UUID) (*stackModel, error) {
