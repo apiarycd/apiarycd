@@ -34,7 +34,7 @@ func Run() {
 		swarm.Module(),
 		//
 		// BUSINESS MODULES
-		fx.Provide(func() health.Version { return health.Version{Version: "0.0.1"} }),
+		fx.Provide(func() health.Version { return health.Version{Version: "0.0.1", ReleaseID: 1} }),
 		stacks.Module(),
 		deployments.Module(),
 		//
