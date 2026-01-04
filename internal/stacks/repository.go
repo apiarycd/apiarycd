@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 const (
@@ -22,14 +21,12 @@ const (
 )
 
 type Repository struct {
-	db     *badger.DB
-	logger *zap.Logger
+	db *badger.DB
 }
 
-func NewRepository(db *badger.DB, logger *zap.Logger) *Repository {
+func NewRepository(db *badger.DB) *Repository {
 	return &Repository{
-		db:     db,
-		logger: logger,
+		db: db,
 	}
 }
 
@@ -44,6 +41,14 @@ func (r *Repository) Create(_ context.Context, stack *StackDraft) error {
 	}
 
 	err = r.db.Update(func(txn *badger.Txn) error {
+		// Check if name already exists
+		nameKey := r.getStackNameKey(model.Name)
+		if _, err := txn.Get(nameKey); err == nil {
+			return fmt.Errorf("%w: stack with name %q already exists", ErrConflict, model.Name)
+		} else if !errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("failed to check name uniqueness: %w", err)
+		}
+
 		// Store the stack
 		key := r.getStackKey(model.ID)
 		if setErr := txn.Set(key, data); setErr != nil {
@@ -132,6 +137,11 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Stack
 		model.ID = old.ID
 		model.CreatedAt = old.CreatedAt
 		model.UpdatedAt = time.Now()
+
+		// If name changed, check uniqueness
+		if model.Name != old.Name {
+			return fmt.Errorf("%w: stack renames are not allowed", ErrNotAllowed)
+		}
 
 		data, err := json.Marshal(model)
 		if err != nil {
@@ -274,14 +284,14 @@ func (r *Repository) createStackIndexes(txn *badger.Txn, stack *stackModel) erro
 
 	// Status index
 	statusKey := []byte(prefixByStatus + string(stack.Status) + ":" + stack.ID.String())
-	if setErr := txn.Set(statusKey, nameData); setErr != nil {
+	if setErr := txn.Set(statusKey, []byte{}); setErr != nil {
 		return fmt.Errorf("failed to set status index: %w", setErr)
 	}
 
 	// Labels index
 	for key, value := range stack.Labels {
 		labelKey := []byte(prefixByLabel + key + ":" + value + ":" + stack.ID.String())
-		if setErr := txn.Set(labelKey, nameData); setErr != nil {
+		if setErr := txn.Set(labelKey, []byte{}); setErr != nil {
 			return fmt.Errorf("failed to set label index: %w", setErr)
 		}
 	}
