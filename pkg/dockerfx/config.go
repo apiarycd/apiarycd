@@ -12,13 +12,13 @@ import (
 //
 // Example:
 //
-//	cfg := docker.Config{
+//	cfg := dockerfx.Config{
 //	    Host:    "unix:///var/run/docker.sock",
-//	    Version: "1.40",
+//	    APIVersion: "1.40",
 //	    Timeout: 30 * time.Second,
 //	}
 //
-//	client := docker.NewClient(cfg)
+//	client := dockerfx.NewClient(cfg)
 type Config struct {
 	// Host specifies the Docker daemon host. It can be a Unix socket path
 	// (e.g., "unix:///var/run/docker.sock") or a TCP address

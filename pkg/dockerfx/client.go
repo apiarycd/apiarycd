@@ -2,8 +2,10 @@ package dockerfx
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/moby/moby/client"
 )
@@ -11,7 +13,7 @@ import (
 // NewClient creates a new Docker client with the given configuration.
 func NewClient(cfg Config) (*client.Client, error) {
 	if cfg.Timeout == 0 {
-		cfg = DefaultConfig()
+		cfg.Timeout = DefaultConfig().Timeout
 	}
 
 	opts := []client.Opt{
@@ -31,16 +33,9 @@ func NewClient(cfg Config) (*client.Client, error) {
 		Timeout: cfg.Timeout,
 	}
 	if cfg.TLSEnabled {
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		}
-		if cfg.TLSConfig.CAFile != "" || cfg.TLSConfig.CertFile != "" || cfg.TLSConfig.KeyFile != "" {
-			// Load TLS certs if provided
-			cert, err := tls.LoadX509KeyPair(cfg.TLSConfig.CertFile, cfg.TLSConfig.KeyFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load TLS certificates: %w", err)
-			}
-			tlsConfig.Certificates = []tls.Certificate{cert}
+		tlsConfig, err := newTLSConfig(cfg)
+		if err != nil {
+			return nil, err
 		}
 
 		httpClient.Transport = &http.Transport{
@@ -55,4 +50,32 @@ func NewClient(cfg Config) (*client.Client, error) {
 	}
 
 	return cli, nil
+}
+
+func newTLSConfig(cfg Config) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if cfg.TLSConfig.CAFile != "" {
+		caCert, err := os.ReadFile(cfg.TLSConfig.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to read CA certificate: %w", ErrInvalidTLSConfig, err)
+		}
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("%w: failed to parse CA certificate", ErrInvalidTLSConfig)
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Load TLS certs if provided
+	if cfg.TLSConfig.CertFile != "" && cfg.TLSConfig.KeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.TLSConfig.CertFile, cfg.TLSConfig.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to load TLS certificates: %w", ErrInvalidTLSConfig, err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return tlsConfig, nil
 }
