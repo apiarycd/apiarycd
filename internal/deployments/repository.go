@@ -98,11 +98,16 @@ func (r *Repository) GetLatestByStack(_ context.Context, stackID uuid.UUID) (*De
 
 		item := it.Item()
 
-		var deployment deploymentModel
-		if err := item.Value(func(val []byte) error { return json.Unmarshal(val, &deployment) }); err != nil {
-			return fmt.Errorf("failed to unmarshal deployment: %w", err)
+		var deploymentID uuid.UUID
+		if err := item.Value(func(val []byte) error { return json.Unmarshal(val, &deploymentID) }); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment ID: %w", err)
 		}
-		latest = &deployment
+
+		found, err := r.getByID(txn, deploymentID)
+		if err != nil {
+			return fmt.Errorf("failed to get deployment by ID: %w", err)
+		}
+		latest = found
 
 		return nil
 	})
