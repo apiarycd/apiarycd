@@ -8,9 +8,9 @@ type Service struct {
 	logger *zap.Logger
 }
 
-func NewService(stacks *Repository, logger *zap.Logger) *Service {
+func NewService(deployments *Repository, logger *zap.Logger) *Service {
 	return &Service{
-		deployments: stacks,
+		deployments: deployments,
 		logger:      logger,
 	}
 }

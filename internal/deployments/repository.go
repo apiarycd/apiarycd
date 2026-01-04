@@ -129,6 +129,7 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Deplo
 		}
 
 		model := newDeploymentModel(&deployment.DeploymentDraft)
+		model.ID = old.ID
 		model.CreatedAt = old.CreatedAt
 		model.UpdatedAt = time.Now()
 
@@ -200,8 +201,7 @@ func (r *Repository) List(_ context.Context) ([]Deployment, error) {
 
 	err := r.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false
-		opts.Reverse = false
+		opts.PrefetchSize = 10
 
 		it := txn.NewIterator(opts)
 		defer it.Close()
@@ -294,7 +294,9 @@ func (r *Repository) createIndexes(txn *badger.Txn, deployment *deploymentModel)
 // removeIndexes removes indexes for a deployment.
 func (r *Repository) removeIndexes(txn *badger.Txn, deployment *deploymentModel) error {
 	// Stack ID index
-	stackKey := []byte(prefixByStack + deployment.StackID.String() + ":" + deployment.ID.String())
+	stackKey := []byte(
+		prefixByStack + deployment.StackID.String() + ":" + strconv.FormatInt(deployment.CreatedAt.UnixNano(), 10),
+	)
 	if err := txn.Delete(stackKey); err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 		return fmt.Errorf("failed to delete stack index: %w", err)
 	}

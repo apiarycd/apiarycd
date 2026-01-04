@@ -38,6 +38,10 @@ type deploymentModel struct {
 }
 
 func newDeploymentModel(draft *DeploymentDraft) *deploymentModel {
+	if draft == nil {
+		return nil
+	}
+
 	return &deploymentModel{
 		BaseEntity: storage.BaseEntity{
 			ID:        uuid.New(),
