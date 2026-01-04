@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/go-core-fx/config"
 )
@@ -17,13 +18,30 @@ type exampleConfig struct {
 	Example string `koanf:"example"`
 }
 
+type storageConfig struct {
+	DataDir string `koanf:"data_dir"`
+}
+
+type dockerConfig struct {
+	Host       string        `koanf:"host"`
+	APIVersion string        `koanf:"api_version"`
+	Timeout    time.Duration `koanf:"timeout"`
+	TLSEnabled bool          `koanf:"tls_enabled"`
+	CAFile     string        `koanf:"ca_file"`
+	CertFile   string        `koanf:"cert_file"`
+	KeyFile    string        `koanf:"key_file"`
+}
+
 type Config struct {
 	HTTP http `koanf:"http"`
 
 	Example exampleConfig `koanf:"example"`
+	Storage storageConfig `koanf:"storage"`
+	Docker  dockerConfig  `koanf:"docker"`
 }
 
 func Default() Config {
+	//nolint:exhaustruct,mnd //default values
 	return Config{
 		HTTP: http{
 			Address:     "127.0.0.1:3000",
@@ -33,6 +51,16 @@ func Default() Config {
 
 		Example: exampleConfig{
 			Example: "example",
+		},
+
+		Storage: storageConfig{
+			DataDir: "./data",
+		},
+
+		Docker: dockerConfig{
+			Host:       "",
+			APIVersion: "",
+			Timeout:    30 * time.Second,
 		},
 	}
 }

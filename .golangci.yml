@@ -241,6 +241,7 @@ linters:
       # Default: []
       exclude:
         # std libs
+        - ^crypto/tls.Config$
         - ^net.ListenConfig$
         - ^net/http.Client$
         - ^net/http.Cookie$
@@ -282,6 +283,7 @@ linters:
         - ^gopkg.in/telebot.v4.Settings$
         - ^gopkg.in/yaml.v3.Node$
         - ^gorm.io/gorm/clause.+$
+        - ^github.com/moby/moby/client.+Options$
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true
