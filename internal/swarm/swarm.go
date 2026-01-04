@@ -58,7 +58,6 @@ func (s *Swarm) InitSwarm(ctx context.Context, req client.SwarmInitOptions) (str
 func (s *Swarm) JoinSwarm(ctx context.Context, req client.SwarmJoinOptions) error {
 	s.logger.Info("Joining Swarm",
 		zap.Strings("remoteAddrs", req.RemoteAddrs),
-		zap.String("joinToken", req.JoinToken),
 		zap.String("listenAddr", req.ListenAddr),
 	)
 
