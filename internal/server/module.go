@@ -36,5 +36,7 @@ func Module() fx.Option {
 				fx.ParamTags(`group:"handlers"`),
 			),
 		),
+
+		fx.Invoke(SetupRoutes),
 	)
 }
