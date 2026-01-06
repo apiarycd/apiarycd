@@ -41,6 +41,18 @@ func (h *Handler) Register(r fiber.Router) {
 	r.Delete("/:id", h.delete)
 }
 
+//	@Summary		Create a new stack
+//	@Description	Create a new Docker Swarm stack with the provided configuration
+//	@Tags			stacks
+//	@Accept			json
+//	@Produce		json
+//	@Param			stack	body		CreateRequest	true	"Stack creation request"
+//	@Success		201		{object}	StackResponse
+//	@Failure		400		{object}	fiberfx.ErrorResponse
+//	@Failure		409		{object}	fiberfx.ErrorResponse
+//	@Router			/stacks [post]
+//
+// Create a new stack.
 func (h *Handler) post(c *fiber.Ctx, req *CreateRequest) error {
 	draft := &stacks.StackDraft{
 		Name:        req.Name,
@@ -62,6 +74,15 @@ func (h *Handler) post(c *fiber.Ctx, req *CreateRequest) error {
 	return c.Status(fiber.StatusCreated).JSON(response)
 }
 
+//	@Summary		List all stacks
+//	@Description	Retrieve a list of all configured stacks
+//	@Tags			stacks
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{array}	StackResponse
+//	@Router			/stacks [get]
+//
+// List all stacks.
 func (h *Handler) list(c *fiber.Ctx) error {
 	stacks, err := h.stacksSvc.List(c.Context())
 	if err != nil {
@@ -76,6 +97,18 @@ func (h *Handler) list(c *fiber.Ctx) error {
 	return c.JSON(responses)
 }
 
+//	@Summary		Get a specific stack
+//	@Description	Retrieve details of a specific stack by ID
+//	@Tags			stacks
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"Stack ID"
+//	@Success		200	{object}	StackResponse
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/stacks/{id} [get]
+//
+// Get a specific stack.
 func (h *Handler) get(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -92,6 +125,19 @@ func (h *Handler) get(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+//	@Summary		Update a stack
+//	@Description	Update an existing stack with the provided fields
+//	@Tags			stacks
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string			true	"Stack ID"
+//	@Param			stack	body		UpdateRequest	false	"Stack update request"
+//	@Success		200		{object}	StackResponse
+//	@Failure		400		{object}	fiberfx.ErrorResponse
+//	@Failure		404		{object}	fiberfx.ErrorResponse
+//	@Router			/stacks/{id} [patch]
+//
+// Update a stack.
 func (h *Handler) patch(c *fiber.Ctx, req *UpdateRequest) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -132,6 +178,18 @@ func (h *Handler) patch(c *fiber.Ctx, req *UpdateRequest) error {
 	return h.get(c)
 }
 
+//	@Summary		Delete a stack
+//	@Description	Delete an existing stack by ID
+//	@Tags			stacks
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path	string	true	"Stack ID"
+//	@Success		204
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/stacks/{id} [delete]
+//
+// Delete a stack.
 func (h *Handler) delete(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
