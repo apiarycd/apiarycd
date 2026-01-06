@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/apiarycd/apiarycd/internal/server/handlers/deployments"
 	"github.com/apiarycd/apiarycd/internal/server/handlers/stacks"
 	"github.com/apiarycd/apiarycd/internal/server/validation"
 	"github.com/go-core-fx/fiberfx"
@@ -42,6 +43,7 @@ func Module() fx.Option {
 		fx.Provide(
 			fx.Annotate(health.NewHandler, fx.ResultTags(`group:"handlers"`)), fx.Private,
 			fx.Annotate(stacks.NewHandler, fx.ResultTags(`group:"handlers"`)), fx.Private,
+			fx.Annotate(deployments.NewHandler, fx.ResultTags(`group:"handlers"`)), fx.Private,
 		),
 
 		fx.Invoke(

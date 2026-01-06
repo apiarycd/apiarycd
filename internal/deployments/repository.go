@@ -239,6 +239,44 @@ func (r *Repository) List(_ context.Context) ([]Deployment, error) {
 	return deployments, nil
 }
 
+func (r *Repository) ListByStack(_ context.Context, stackID uuid.UUID) ([]Deployment, error) {
+	var deployments []Deployment
+
+	err := r.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		prefix := r.getStackPrefix(stackID)
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+
+			if err := item.Value(func(val []byte) error {
+				var deployment deploymentModel
+				if err := json.Unmarshal(val, &deployment); err != nil {
+					return fmt.Errorf("failed to unmarshal deployment: %w", err)
+				}
+
+				deployments = append(deployments, *newDeployment(&deployment))
+
+				return nil
+			}); err != nil {
+				return fmt.Errorf("failed to unmarshal deployment: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return deployments, fmt.Errorf("failed to list deployments: %w", err)
+	}
+
+	return deployments, nil
+}
+
 func (r *Repository) getByID(txn *badger.Txn, id uuid.UUID) (*deploymentModel, error) {
 	key := r.getKey(id)
 	item, err := txn.Get(key)
