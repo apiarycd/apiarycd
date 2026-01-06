@@ -20,7 +20,11 @@ type Handler struct {
 	logger    *zap.Logger
 }
 
-func NewHandler(deploymentsSvc *deployments.Service, validator *validator.Validate, logger *zap.Logger) handler.Handler {
+func NewHandler(
+	deploymentsSvc *deployments.Service,
+	validator *validator.Validate,
+	logger *zap.Logger,
+) handler.Handler {
 	return &Handler{
 		deploymentsSvc: deploymentsSvc,
 
@@ -42,6 +46,18 @@ func (h *Handler) Register(r fiber.Router) {
 	r.Post("/:id/trigger", h.trigger)
 }
 
+//	@Summary		Create a new deployment
+//	@Description	Create a new deployment for a stack with the provided configuration
+//	@Tags			deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			deployment	body		CreateRequest	true	"Deployment creation request"
+//	@Success		201			{object}	DeploymentResponse
+//	@Failure		400			{object}	fiberfx.ErrorResponse
+//	@Failure		404			{object}	fiberfx.ErrorResponse
+//	@Router			/deployments [post]
+//
+// Create a new deployment.
 func (h *Handler) post(c *fiber.Ctx, req *CreateRequest) error {
 	draft := deployments.DeploymentDraft{
 		StackID:     req.StackID,
@@ -61,6 +77,15 @@ func (h *Handler) post(c *fiber.Ctx, req *CreateRequest) error {
 	return c.Status(fiber.StatusCreated).JSON(response)
 }
 
+//	@Summary		List all deployments
+//	@Description	Retrieve a list of all deployments
+//	@Tags			deployments
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{array}	DeploymentResponse
+//	@Router			/deployments [get]
+//
+// List all deployments.
 func (h *Handler) list(c *fiber.Ctx) error {
 	deployments, err := h.deploymentsSvc.List(c.Context())
 	if err != nil {
@@ -75,6 +100,18 @@ func (h *Handler) list(c *fiber.Ctx) error {
 	return c.JSON(responses)
 }
 
+//	@Summary		Get a specific deployment
+//	@Description	Retrieve details of a specific deployment by ID
+//	@Tags			deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"Deployment ID"
+//	@Success		200	{object}	DeploymentResponse
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/deployments/{id} [get]
+//
+// Get a specific deployment.
 func (h *Handler) get(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -91,6 +128,19 @@ func (h *Handler) get(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+//	@Summary		Update a deployment
+//	@Description	Update an existing deployment with the provided fields
+//	@Tags			deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		string			true	"Deployment ID"
+//	@Param			deployment	body		UpdateRequest	false	"Deployment update request"
+//	@Success		200			{object}	DeploymentResponse
+//	@Failure		400			{object}	fiberfx.ErrorResponse
+//	@Failure		404			{object}	fiberfx.ErrorResponse
+//	@Router			/deployments/{id} [patch]
+//
+// Update a deployment.
 func (h *Handler) put(c *fiber.Ctx, req *UpdateRequest) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -128,6 +178,18 @@ func (h *Handler) put(c *fiber.Ctx, req *UpdateRequest) error {
 	return h.get(c)
 }
 
+//	@Summary		Delete a deployment
+//	@Description	Delete an existing deployment by ID
+//	@Tags			deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path	string	true	"Deployment ID"
+//	@Success		204
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/deployments/{id} [delete]
+//
+// Delete a deployment.
 func (h *Handler) delete(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -143,6 +205,18 @@ func (h *Handler) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+//	@Summary		Trigger a deployment
+//	@Description	Manually trigger the execution of a deployment
+//	@Tags			deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path	string	true	"Deployment ID"
+//	@Success		202
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/deployments/{id}/trigger [post]
+//
+// Trigger a deployment.
 func (h *Handler) trigger(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -164,8 +238,7 @@ func (h *Handler) errorsHandler(c *fiber.Ctx) error {
 		return nil
 	}
 
-	switch {
-	case errors.Is(err, deployments.ErrNotFound):
+	if errors.Is(err, deployments.ErrNotFound) {
 		return fiber.NewError(fiber.StatusNotFound, err.Error())
 	}
 

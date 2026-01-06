@@ -18,10 +18,13 @@ type Service struct {
 	logger *zap.Logger
 }
 
-func NewService(deployments *Repository, logger *zap.Logger) *Service {
+func NewService(deployments *Repository, stacksSvc *stacks.Service, logger *zap.Logger) *Service {
 	return &Service{
 		deployments: deployments,
-		logger:      logger,
+
+		stacksSvc: stacksSvc,
+
+		logger: logger,
 	}
 }
 
@@ -138,7 +141,7 @@ func (s *Service) Trigger(ctx context.Context, id uuid.UUID) error {
 	// TODO: Implement actual deployment logic here (e.g., Docker Compose deployment)
 
 	// For now, simulate deployment completion
-	time.Sleep(100 * time.Millisecond) // Simulate some work
+	time.Sleep(time.Second) // Simulate some work
 
 	completedAt := time.Now()
 	err = s.Update(ctx, id, func(d *Deployment) error {
@@ -147,7 +150,11 @@ func (s *Service) Trigger(ctx context.Context, id uuid.UUID) error {
 		return nil
 	})
 	if err != nil {
-		s.logger.Error("failed to update deployment status after trigger", zap.String("id", id.String()), zap.Error(err))
+		s.logger.Error(
+			"failed to update deployment status after trigger",
+			zap.String("id", id.String()),
+			zap.Error(err),
+		)
 		return err
 	}
 
