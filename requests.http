@@ -33,6 +33,9 @@ Content-Type: application/json
 DELETE {{apiURL}}/stacks/d23d6a09-9df0-4233-ac20-ea0c60a05eb0 HTTP/1.1
 
 ###
+GET {{apiURL}}/deployments HTTP/1.1
+
+###
 GET {{baseURL}}/health HTTP/1.1
 
 ###
