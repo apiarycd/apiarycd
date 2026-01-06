@@ -34,7 +34,12 @@ func NewErrors(err error) Errors {
 		}
 		return validationErrs
 	}
-	return nil
+	return Errors{Error{
+		Message: err.Error(),
+		Field:   "",
+		Tag:     "",
+		Value:   "",
+	}}
 }
 
 func (ve Errors) Error() string {

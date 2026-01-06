@@ -30,23 +30,11 @@ func NewBody[T any](validate *validator.Validate) fiber.Handler {
 func ValidateBody[T any](c *fiber.Ctx, validate *validator.Validate) (*T, error) {
 	var req T
 	if err := c.BodyParser(&req); err != nil {
-		return nil, c.Status(fiber.StatusBadRequest).JSON(
-			fiberfx.NewErrorResponse(
-				err.Error(),
-				fiber.StatusBadRequest,
-				nil,
-			),
-		)
+		return nil, NewErrors(err)
 	}
 
-	if err := validate.Var(req, "required,dive"); err != nil {
-		return nil, c.Status(fiber.StatusBadRequest).JSON(
-			fiberfx.NewErrorResponse(
-				err.Error(),
-				fiber.StatusBadRequest,
-				NewErrors(err),
-			),
-		)
+	if err := validate.Var(&req, "required,dive"); err != nil {
+		return nil, NewErrors(err)
 	}
 
 	return &req, nil

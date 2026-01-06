@@ -20,11 +20,6 @@ type StackDraft struct {
 	Variables  map[string]string // Default variables
 	AutoDeploy bool              // Auto-deploy on git push
 
-	// Status
-	Status     Status     // active, inactive, error
-	LastSync   *time.Time // Last successful sync
-	LastDeploy *time.Time // Last successful deployment
-
 	// Metadata
 	Labels map[string]string // Custom labels for filtering
 }
@@ -35,4 +30,9 @@ type Stack struct {
 	ID        uuid.UUID
 	CreatedAt time.Time
 	UpdatedAt time.Time
+
+	// Status
+	Status     Status     // active, inactive, error
+	LastSync   *time.Time // Last successful sync
+	LastDeploy *time.Time // Last successful deployment
 }
