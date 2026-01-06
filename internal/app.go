@@ -10,6 +10,7 @@ import (
 	"github.com/apiarycd/apiarycd/internal/swarm"
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
+	"github.com/capcom6/go-infra-fx/validator"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/health"
 	"github.com/go-core-fx/healthfx"
@@ -27,6 +28,7 @@ func Run() {
 		dockerfx.Module(),
 		healthfx.Module(),
 		fiberfx.Module(),
+		validator.Module,
 		//
 		// APP MODULES
 		config.Module(),

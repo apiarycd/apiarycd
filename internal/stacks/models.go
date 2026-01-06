@@ -59,9 +59,9 @@ func newStackModel(stack *StackDraft) *stackModel {
 		ComposePath: stack.ComposePath,
 		Variables:   stack.Variables,
 		AutoDeploy:  stack.AutoDeploy,
-		Status:      stack.Status,
-		LastSync:    stack.LastSync,
-		LastDeploy:  stack.LastDeploy,
+		Status:      StatusActive,
+		LastSync:    nil,
+		LastDeploy:  nil,
 		Labels:      stack.Labels,
 	}
 }
@@ -80,13 +80,14 @@ func newStack(model *stackModel) *Stack {
 			ComposePath: model.ComposePath,
 			Variables:   model.Variables,
 			AutoDeploy:  model.AutoDeploy,
-			Status:      model.Status,
-			LastSync:    model.LastSync,
-			LastDeploy:  model.LastDeploy,
 			Labels:      model.Labels,
 		},
 		ID:        model.ID,
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
+
+		Status:     model.Status,
+		LastSync:   model.LastSync,
+		LastDeploy: model.LastDeploy,
 	}
 }

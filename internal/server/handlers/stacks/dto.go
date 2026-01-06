@@ -1,5 +1,11 @@
 package stacks
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
 // CreateRequest represents the request payload for creating a stack.
 type CreateRequest struct {
 	Name        string            `json:"name"                validate:"required,min=1,max=100"`
@@ -21,4 +27,16 @@ type UpdateRequest struct {
 	Variables   *map[string]string `json:"variables,omitempty"`
 	AutoDeploy  *bool              `json:"auto_deploy,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty"`
+}
+
+// StackResponse represents the response payload for a stack.
+type StackResponse struct {
+	CreateRequest
+
+	ID         uuid.UUID  `json:"id"`
+	Status     string     `json:"status"`
+	LastSync   *time.Time `json:"last_sync,omitempty"`
+	LastDeploy *time.Time `json:"last_deploy,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
