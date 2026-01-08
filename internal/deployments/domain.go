@@ -9,12 +9,21 @@ import (
 type Status string
 
 const (
-	StatusPending   Status = "pending"
-	StatusRunning   Status = "running"
-	StatusSuccess   Status = "success"
-	StatusFailed    Status = "failed"
-	StatusCancelled Status = "cancelled"
+	StatusPending    Status = "pending"     // Deployment has not started
+	StatusRunning    Status = "running"     // Deployment is in progress
+	StatusSuccess    Status = "success"     // Deployment completed successfully
+	StatusFailed     Status = "failed"      // Deployment failed
+	StatusCancelled  Status = "cancelled"   // Deployment was cancelled
+	StatusRolledBack Status = "rolled_back" // Deployment was rolled back
 )
+
+type DeploymentRequest struct {
+	// References
+	StackID uuid.UUID
+
+	// Deployment Configuration
+	Variables map[string]string // Deployment-specific variables
+}
 
 type DeploymentDraft struct {
 	// References
@@ -26,8 +35,7 @@ type DeploymentDraft struct {
 	Message string // Git commit message
 
 	// Deployment Configuration
-	Variables   map[string]string // Deployment-specific variables
-	Environment string            // Environment name (prod, staging, etc.)
+	Variables map[string]string // Deployment-specific variables
 
 	// Status
 	Status      Status     // pending, running, success, failed, cancelled
@@ -36,11 +44,10 @@ type DeploymentDraft struct {
 	Error       string     // Error message if failed
 
 	// Logs and Metrics
-	Logs        []string // Deployment logs
-	HealthCheck string   // Health check URL or command
+	Logs []string // Deployment logs
 
 	// Rollback Information
-	RollbackFrom *uuid.UUID // Previous deployment ID for rollback
+	PreviousDeployment *uuid.UUID // Previous deployment ID for rollback
 }
 
 type Deployment struct {
@@ -49,4 +56,14 @@ type Deployment struct {
 	ID        uuid.UUID
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+func (d *Deployment) MarkDeployedAt(deployedAt time.Time) {
+	d.Status = StatusSuccess
+	d.CompletedAt = &deployedAt
+}
+
+func (d *Deployment) MarkRolledBack(rolledBackAt time.Time) {
+	d.Status = StatusRolledBack
+	d.CompletedAt = &rolledBackAt
 }
