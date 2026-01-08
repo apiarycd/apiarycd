@@ -10,7 +10,6 @@ import (
 	"github.com/go-core-fx/fiberfx/handler"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
@@ -23,9 +22,15 @@ type Handler struct {
 	logger    *zap.Logger
 }
 
-func NewHandler(stacksSvc *stacks.Service, validator *validator.Validate, logger *zap.Logger) handler.Handler {
+func NewHandler(
+	stacksSvc *stacks.Service,
+	deploymentsSvc *deployments.Service,
+	validator *validator.Validate,
+	logger *zap.Logger,
+) handler.Handler {
 	return &Handler{
-		stacksSvc: stacksSvc,
+		stacksSvc:      stacksSvc,
+		deploymentsSvc: deploymentsSvc,
 
 		validator: validator,
 		logger:    logger,
@@ -61,7 +66,7 @@ func (h *Handler) Register(r fiber.Router) {
 //	@Tags			stacks
 //	@Accept			json
 //	@Produce		json
-//	@Param			stack	body		CreateRequest	true	"Stack creation request"
+//	@Param			stack	body		POSTRequest	true	"Stack creation request"
 //	@Success		201		{object}	StackResponse
 //	@Failure		400		{object}	fiberfx.ErrorResponse
 //	@Failure		409		{object}	fiberfx.ErrorResponse
@@ -74,6 +79,10 @@ func (h *Handler) post(c *fiber.Ctx, req *POSTRequest) error {
 		Description: req.Description,
 		GitURL:      req.GitURL,
 		GitBranch:   req.GitBranch,
+		GitAuth: stacks.GitAuth{
+			Username: req.GitAuth.Username,
+			Password: req.GitAuth.Password,
+		},
 		ComposePath: req.ComposePath,
 		Variables:   req.Variables,
 		Labels:      req.Labels,
@@ -143,11 +152,11 @@ func (h *Handler) get(c *fiber.Ctx) error {
 //	@Tags			stacks
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path		string			true	"Stack ID"
-//	@Param			stack	body		UpdateRequest	false	"Stack update request"
-//	@Success		200		{object}	StackResponse
-//	@Failure		400		{object}	fiberfx.ErrorResponse
-//	@Failure		404		{object}	fiberfx.ErrorResponse
+//	@Param			id		path	string			true	"Stack ID"
+//	@Param			stack	body	PATCHRequest	false	"Stack update request"
+//	@Success		204
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
 //	@Router			/stacks/{id} [patch]
 //
 // Update a stack.
@@ -190,7 +199,7 @@ func (h *Handler) patch(c *fiber.Ctx, req *PATCHRequest) error {
 		return fmt.Errorf("failed to update stack: %w", err)
 	}
 
-	return h.get(c)
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 //	@Summary		Delete a stack
@@ -206,10 +215,9 @@ func (h *Handler) patch(c *fiber.Ctx, req *PATCHRequest) error {
 //
 // Delete a stack.
 func (h *Handler) delete(c *fiber.Ctx) error {
-	idParam := c.Params("id")
-	id, err := uuid.Parse(idParam)
+	id, err := getStackID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return err
 	}
 
 	err = h.stacksSvc.Delete(c.Context(), id)
@@ -220,7 +228,21 @@ func (h *Handler) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// Deployments API
+// Deployments API.
+
+//	@Summary		Deploy a stack
+//	@Description	Trigger a deployment of a stack
+//	@Tags			stacks, deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string				true	"Stack ID"
+//	@Param			deploy	body		POSTDeployRequest	false	"Deployment request"
+//	@Success		200		{object}	DeploymentResponse
+//	@Failure		400		{object}	fiberfx.ErrorResponse
+//	@Failure		404		{object}	fiberfx.ErrorResponse
+//	@Router			/stacks/{id}/deploy [post]
+//
+// Deploy a stack.
 func (h *Handler) deploy(c *fiber.Ctx, req *POSTDeployRequest) error {
 	id, err := getStackID(c)
 	if err != nil {
@@ -241,6 +263,18 @@ func (h *Handler) deploy(c *fiber.Ctx, req *POSTDeployRequest) error {
 	return c.JSON(newDeploymentResponse(d))
 }
 
+//	@Summary		List deployments for a stack
+//	@Description	List all deployments for a stack
+//	@Tags			stacks, deployments
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"Stack ID"
+//	@Success		200	{object}	[]DeploymentResponse
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/stacks/{id}/history [get]
+//
+// List deployments for a stack.
 func (h *Handler) history(c *fiber.Ctx) error {
 	id, err := getStackID(c)
 	if err != nil {
@@ -262,8 +296,30 @@ func (h *Handler) history(c *fiber.Ctx) error {
 	)
 }
 
+//	@Summary		Rollback a stack
+//	@Description	Rollback a stack to a previous version
+//	@Tags			stacks
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"Stack ID"
+//	@Success		200	{object}	StackResponse
+//	@Failure		400	{object}	fiberfx.ErrorResponse
+//	@Failure		404	{object}	fiberfx.ErrorResponse
+//	@Router			/stacks/{id}/rollback [post]
+//
+// Rollback a stack.
 func (h *Handler) rollback(c *fiber.Ctx) error {
-	return fiber.ErrNotImplemented
+	id, err := getStackID(c)
+	if err != nil {
+		return err
+	}
+
+	_, current, err := h.deploymentsSvc.Rollback(c.Context(), id)
+	if err != nil {
+		return fmt.Errorf("failed to rollback stack: %w", err)
+	}
+
+	return c.JSON(newDeploymentResponse(current))
 }
 
 func (h *Handler) errorsHandler(c *fiber.Ctx) error {
@@ -273,18 +329,24 @@ func (h *Handler) errorsHandler(c *fiber.Ctx) error {
 	}
 
 	switch {
-	case errors.Is(err, stacks.ErrNotFound), errors.Is(err, stacks.ErrNotAllowed):
+	case errors.Is(err, stacks.ErrNotAllowed):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, stacks.ErrNotFound):
 		return fiber.NewError(fiber.StatusNotFound, err.Error())
 	case errors.Is(err, stacks.ErrConflict):
 		return fiber.NewError(fiber.StatusConflict, err.Error())
 	}
 
-	return err //nolint:wrapcheck //alredy wrapped
+	if errors.Is(err, deployments.ErrNotFound) {
+		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	}
+
+	return err //nolint:wrapcheck //already wrapped
 }
 
 func (h *Handler) toResponse(stack *stacks.Stack) StackResponse {
 	return StackResponse{
-		POSTRequest: POSTRequest{
+		Stack: Stack{
 			Name:        stack.Name,
 			Description: stack.Description,
 			GitURL:      stack.GitURL,

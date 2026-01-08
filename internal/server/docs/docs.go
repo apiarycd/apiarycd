@@ -24,250 +24,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/deployments": {
-            "get": {
-                "description": "Retrieve a list of all deployments",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "deployments"
-                ],
-                "summary": "List all deployments",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/deployments.DeploymentResponse"
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create a new deployment for a stack with the provided configuration",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "deployments"
-                ],
-                "summary": "Create a new deployment",
-                "parameters": [
-                    {
-                        "description": "Deployment creation request",
-                        "name": "deployment",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/deployments.CreateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/deployments.DeploymentResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/deployments/{id}": {
-            "get": {
-                "description": "Retrieve details of a specific deployment by ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "deployments"
-                ],
-                "summary": "Get a specific deployment",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Deployment ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/deployments.DeploymentResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Delete an existing deployment by ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "deployments"
-                ],
-                "summary": "Delete a deployment",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Deployment ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "description": "Update an existing deployment with the provided fields",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "deployments"
-                ],
-                "summary": "Update a deployment",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Deployment ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Deployment update request",
-                        "name": "deployment",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/deployments.UpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/deployments.DeploymentResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/deployments/{id}/trigger": {
-            "post": {
-                "description": "Manually trigger the execution of a deployment",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "deployments"
-                ],
-                "summary": "Trigger a deployment",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Deployment ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/fiberfx.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/stacks": {
             "get": {
                 "description": "Retrieve a list of all configured stacks",
@@ -312,7 +68,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/stacks.CreateRequest"
+                            "$ref": "#/definitions/stacks.POSTRequest"
                         }
                     }
                 ],
@@ -445,8 +201,150 @@ const docTemplate = `{
                         "name": "stack",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/stacks.UpdateRequest"
+                            "$ref": "#/definitions/stacks.PATCHRequest"
                         }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/fiberfx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/fiberfx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stacks/{id}/deploy": {
+            "post": {
+                "description": "Trigger a deployment of a stack",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "stacks",
+                    "deployments"
+                ],
+                "summary": "Deploy a stack",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stack ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Deployment request",
+                        "name": "deploy",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/stacks.POSTDeployRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/stacks.DeploymentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/fiberfx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/fiberfx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stacks/{id}/history": {
+            "get": {
+                "description": "List all deployments for a stack",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "stacks",
+                    "deployments"
+                ],
+                "summary": "List deployments for a stack",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stack ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/stacks.DeploymentResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/fiberfx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/fiberfx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stacks/{id}/rollback": {
+            "post": {
+                "description": "Rollback a stack to a previous version",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "stacks"
+                ],
+                "summary": "Rollback a stack",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stack ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -473,156 +371,24 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "deployments.CreateRequest": {
-            "type": "object",
-            "required": [
-                "environment",
-                "git_ref",
-                "stack_id",
-                "version"
+        "deployments.Status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "success",
+                "failed",
+                "cancelled",
+                "rolled_back"
             ],
-            "properties": {
-                "environment": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1
-                },
-                "git_ref": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "message": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "stack_id": {
-                    "type": "string"
-                },
-                "variables": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "version": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                }
-            }
-        },
-        "deployments.DeploymentResponse": {
-            "type": "object",
-            "required": [
-                "environment",
-                "git_ref",
-                "stack_id",
-                "version"
-            ],
-            "properties": {
-                "completed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "environment": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1
-                },
-                "error": {
-                    "type": "string"
-                },
-                "git_ref": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "health_check": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "logs": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "message": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "rollback_from": {
-                    "type": "string"
-                },
-                "stack_id": {
-                    "type": "string"
-                },
-                "started_at": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "variables": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "version": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                }
-            }
-        },
-        "deployments.UpdateRequest": {
-            "type": "object",
-            "properties": {
-                "environment": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1
-                },
-                "git_ref": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "message": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "pending",
-                        "running",
-                        "success",
-                        "failed",
-                        "cancelled"
-                    ]
-                },
-                "variables": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "version": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                }
-            }
+            "x-enum-varnames": [
+                "StatusPending",
+                "StatusRunning",
+                "StatusSuccess",
+                "StatusFailed",
+                "StatusCancelled",
+                "StatusRolledBack"
+            ]
         },
         "fiberfx.ErrorResponse": {
             "type": "object",
@@ -636,18 +402,89 @@ const docTemplate = `{
                 }
             }
         },
-        "stacks.CreateRequest": {
+        "github_com_apiarycd_apiarycd_internal_server_handlers_stacks.GitAuth": {
             "type": "object",
-            "required": [
-                "compose_path",
-                "git_branch",
-                "git_url",
-                "name"
-            ],
             "properties": {
-                "auto_deploy": {
-                    "type": "boolean"
+                "password": {
+                    "type": "string"
                 },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "stacks.DeploymentResponse": {
+            "type": "object",
+            "properties": {
+                "completed_at": {
+                    "description": "When deployment completed/failed",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "Timestamps",
+                    "type": "string"
+                },
+                "error": {
+                    "description": "Error message if failed",
+                    "type": "string"
+                },
+                "git_ref": {
+                    "description": "Branch, tag, or commit",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "logs": {
+                    "description": "Logs and Metrics",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "description": "Git commit message",
+                    "type": "string"
+                },
+                "previous_deployments": {
+                    "description": "Rollback Information",
+                    "type": "string"
+                },
+                "stack_id": {
+                    "description": "References",
+                    "type": "string"
+                },
+                "started_at": {
+                    "description": "When deployment started",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/deployments.Status"
+                        }
+                    ]
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "variables": {
+                    "description": "Deployment Configuration",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "version": {
+                    "description": "Deployment Details",
+                    "type": "string"
+                }
+            }
+        },
+        "stacks.PATCHRequest": {
+            "type": "object",
+            "properties": {
                 "compose_path": {
                     "type": "string",
                     "maxLength": 255,
@@ -656,6 +493,63 @@ const docTemplate = `{
                 "description": {
                     "type": "string",
                     "maxLength": 500
+                },
+                "git_auth": {
+                    "$ref": "#/definitions/github_com_apiarycd_apiarycd_internal_server_handlers_stacks.GitAuth"
+                },
+                "git_branch": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
+                },
+                "git_url": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "variables": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "stacks.POSTDeployRequest": {
+            "type": "object",
+            "properties": {
+                "variables": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "stacks.POSTRequest": {
+            "type": "object",
+            "required": [
+                "compose_path",
+                "git_branch",
+                "git_url",
+                "name"
+            ],
+            "properties": {
+                "compose_path": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "git_auth": {
+                    "$ref": "#/definitions/github_com_apiarycd_apiarycd_internal_server_handlers_stacks.GitAuth"
                 },
                 "git_branch": {
                     "type": "string",
@@ -693,9 +587,6 @@ const docTemplate = `{
                 "name"
             ],
             "properties": {
-                "auto_deploy": {
-                    "type": "boolean"
-                },
                 "compose_path": {
                     "type": "string",
                     "maxLength": 255,
@@ -741,43 +632,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "variables": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "stacks.UpdateRequest": {
-            "type": "object",
-            "properties": {
-                "auto_deploy": {
-                    "type": "boolean"
-                },
-                "compose_path": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "git_branch": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "git_url": {
-                    "type": "string"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
                 },
                 "variables": {
                     "type": "object",

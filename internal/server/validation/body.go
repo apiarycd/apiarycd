@@ -41,13 +41,13 @@ func ValidateBody[T any](c *fiber.Ctx, validate *validator.Validate) (*T, error)
 }
 
 // GetValidatedBody retrieves the validated request from the context.
-func GetValidatedBody[T any](c *fiber.Ctx) (T, bool) {
-	b, ok := c.Locals(localBody).(T)
+func GetValidatedBody[T any](c *fiber.Ctx) (*T, bool) {
+	b, ok := c.Locals(localBody).(*T)
 	return b, ok
 }
 
 // DecorateWithBody decorates a handler with the validated request.
-func DecorateWithBody[T any](h func(c *fiber.Ctx, body T) error) fiber.Handler {
+func DecorateWithBody[T any](h func(c *fiber.Ctx, body *T) error) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		body, ok := GetValidatedBody[T](c)
 		if !ok {

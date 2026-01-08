@@ -9,7 +9,7 @@ func getStackID(c *fiber.Ctx) (uuid.UUID, error) {
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
-		return uuid.UUID{}, fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return uuid.UUID{}, fiber.NewError(fiber.StatusBadRequest, "Invalid stack ID format")
 	}
 	return id, nil
 }

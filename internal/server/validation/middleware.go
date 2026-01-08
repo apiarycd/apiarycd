@@ -22,5 +22,5 @@ func Middleware(c *fiber.Ctx) error {
 		)
 	}
 
-	return err //nolint:wrapcheck //to upper middleware
+	return err //nolint:wrapcheck // pass to upstream middleware
 }
