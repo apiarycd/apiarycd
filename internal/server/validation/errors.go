@@ -20,7 +20,7 @@ type Error struct {
 type Errors []Error
 
 // NewErrors converts validator errors to ValidationErrors.
-func NewErrors(err error) Errors {
+func NewErrors(err error) error {
 	if errs, ok := lo.ErrorsAs[validator.ValidationErrors](err); ok {
 		validationErrs := make([]Error, 0, len(errs))
 		for _, e := range errs {
@@ -32,14 +32,9 @@ func NewErrors(err error) Errors {
 			}
 			validationErrs = append(validationErrs, validationErr)
 		}
-		return validationErrs
+		return Errors(validationErrs)
 	}
-	return Errors{Error{
-		Message: err.Error(),
-		Field:   "",
-		Tag:     "",
-		Value:   "",
-	}}
+	return err
 }
 
 func (ve Errors) Error() string {
@@ -56,9 +51,9 @@ func getMessageForTag(tag, field, param string) string {
 	case "required":
 		return fmt.Sprintf("%s is required", field)
 	case "min":
-		return fmt.Sprintf("%s must be at least %s characters long", field, param)
+		return fmt.Sprintf("%s must be at least %s", field, param)
 	case "max":
-		return fmt.Sprintf("%s must be at most %s characters long", field, param)
+		return fmt.Sprintf("%s must be at most %s", field, param)
 	case "url":
 		return fmt.Sprintf("%s must be a valid URL", field)
 	case "oneof":
