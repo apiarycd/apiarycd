@@ -6,19 +6,24 @@ import (
 	"github.com/google/uuid"
 )
 
+type GitAuth struct {
+	Username string
+	Password string
+}
+
 type StackDraft struct {
 	// Basic Information
 	Name        string
 	Description string
 
 	// Git Repository Information
-	GitURL      string // HTTPS or SSH URL
-	GitBranch   string // Default branch to monitor
-	ComposePath string // Path to docker-compose.yml
+	GitURL      string  // HTTPS or SSH URL
+	GitBranch   string  // Default branch to monitor
+	GitAuth     GitAuth // Authentication
+	ComposePath string  // Path to docker-compose.yml
 
 	// Configuration
-	Variables  map[string]string // Default variables
-	AutoDeploy bool              // Auto-deploy on git push
+	Variables map[string]string // Default variables
 
 	// Metadata
 	Labels map[string]string // Custom labels for filtering

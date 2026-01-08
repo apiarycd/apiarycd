@@ -4,17 +4,20 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/apiarycd/apiarycd/internal/deployments"
 	"github.com/apiarycd/apiarycd/internal/server/validation"
 	"github.com/apiarycd/apiarycd/internal/stacks"
 	"github.com/go-core-fx/fiberfx/handler"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
 
 type Handler struct {
-	stacksSvc *stacks.Service
+	stacksSvc      *stacks.Service
+	deploymentsSvc *deployments.Service
 
 	validator *validator.Validate
 	logger    *zap.Logger
@@ -34,11 +37,23 @@ func (h *Handler) Register(r fiber.Router) {
 	r = r.Group("/stacks")
 
 	r.Use(h.errorsHandler)
-	r.Post("/", validation.DecorateWithBodyEx(h.validator, h.post))
+	// GET    /api/v1/stacks                 # List stacks
 	r.Get("/", h.list)
+	// POST   /api/v1/stacks                 # Create stack
+	r.Post("/", validation.DecorateWithBodyEx(h.validator, h.post))
+	// GET    /api/v1/stacks/{id}           # Get stack details
 	r.Get("/:id", h.get)
+	// PATCH  /api/v1/stacks/{id}           # Update stack
 	r.Patch("/:id", validation.DecorateWithBodyEx(h.validator, h.patch))
+	// DELETE /api/v1/stacks/{id}           # Delete stack
 	r.Delete("/:id", h.delete)
+
+	// POST   /api/v1/stacks/{id}/deploy    # Deploy stack
+	r.Post("/:id/deploy", validation.DecorateWithBodyEx(h.validator, h.deploy))
+	// GET    /api/v1/stacks/{id}/history   # Deployment history
+	r.Get("/:id/history", h.history)
+	// POST   /api/v1/stacks/{id}/rollback  # Rollback to previous version
+	r.Post("/:id/rollback", h.rollback)
 }
 
 //	@Summary		Create a new stack
@@ -53,7 +68,7 @@ func (h *Handler) Register(r fiber.Router) {
 //	@Router			/stacks [post]
 //
 // Create a new stack.
-func (h *Handler) post(c *fiber.Ctx, req *CreateRequest) error {
+func (h *Handler) post(c *fiber.Ctx, req *POSTRequest) error {
 	draft := &stacks.StackDraft{
 		Name:        req.Name,
 		Description: req.Description,
@@ -61,7 +76,6 @@ func (h *Handler) post(c *fiber.Ctx, req *CreateRequest) error {
 		GitBranch:   req.GitBranch,
 		ComposePath: req.ComposePath,
 		Variables:   req.Variables,
-		AutoDeploy:  req.AutoDeploy,
 		Labels:      req.Labels,
 	}
 
@@ -110,10 +124,9 @@ func (h *Handler) list(c *fiber.Ctx) error {
 //
 // Get a specific stack.
 func (h *Handler) get(c *fiber.Ctx) error {
-	idParam := c.Params("id")
-	id, err := uuid.Parse(idParam)
+	id, err := getStackID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return err
 	}
 
 	stack, err := h.stacksSvc.Get(c.Context(), id)
@@ -138,11 +151,10 @@ func (h *Handler) get(c *fiber.Ctx) error {
 //	@Router			/stacks/{id} [patch]
 //
 // Update a stack.
-func (h *Handler) patch(c *fiber.Ctx, req *UpdateRequest) error {
-	idParam := c.Params("id")
-	id, err := uuid.Parse(idParam)
+func (h *Handler) patch(c *fiber.Ctx, req *PATCHRequest) error {
+	id, err := getStackID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return err
 	}
 
 	updater := func(stack *stacks.Stack) error {
@@ -155,14 +167,17 @@ func (h *Handler) patch(c *fiber.Ctx, req *UpdateRequest) error {
 		if req.GitBranch != nil {
 			stack.GitBranch = *req.GitBranch
 		}
+		if req.GitAuth != nil {
+			stack.GitAuth = stacks.GitAuth{
+				Username: req.GitAuth.Username,
+				Password: req.GitAuth.Password,
+			}
+		}
 		if req.ComposePath != nil {
 			stack.ComposePath = *req.ComposePath
 		}
 		if req.Variables != nil {
 			stack.Variables = *req.Variables
-		}
-		if req.AutoDeploy != nil {
-			stack.AutoDeploy = *req.AutoDeploy
 		}
 		if req.Labels != nil {
 			stack.Labels = *req.Labels
@@ -205,6 +220,52 @@ func (h *Handler) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// Deployments API
+func (h *Handler) deploy(c *fiber.Ctx, req *POSTDeployRequest) error {
+	id, err := getStackID(c)
+	if err != nil {
+		return err
+	}
+
+	d, err := h.deploymentsSvc.Trigger(
+		c.Context(),
+		deployments.DeploymentRequest{
+			StackID:   id,
+			Variables: req.Variables,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to trigger deployment: %w", err)
+	}
+
+	return c.JSON(newDeploymentResponse(d))
+}
+
+func (h *Handler) history(c *fiber.Ctx) error {
+	id, err := getStackID(c)
+	if err != nil {
+		return err
+	}
+
+	deps, err := h.deploymentsSvc.ListByStack(c.Context(), id)
+	if err != nil {
+		return fmt.Errorf("failed to list deployments: %w", err)
+	}
+
+	return c.JSON(
+		lo.Map(
+			deps,
+			func(d deployments.Deployment, _ int) DeploymentResponse {
+				return newDeploymentResponse(&d)
+			},
+		),
+	)
+}
+
+func (h *Handler) rollback(c *fiber.Ctx) error {
+	return fiber.ErrNotImplemented
+}
+
 func (h *Handler) errorsHandler(c *fiber.Ctx) error {
 	err := c.Next()
 	if err == nil {
@@ -223,14 +284,13 @@ func (h *Handler) errorsHandler(c *fiber.Ctx) error {
 
 func (h *Handler) toResponse(stack *stacks.Stack) StackResponse {
 	return StackResponse{
-		CreateRequest: CreateRequest{
+		POSTRequest: POSTRequest{
 			Name:        stack.Name,
 			Description: stack.Description,
 			GitURL:      stack.GitURL,
 			GitBranch:   stack.GitBranch,
 			ComposePath: stack.ComposePath,
 			Variables:   stack.Variables,
-			AutoDeploy:  stack.AutoDeploy,
 			Labels:      stack.Labels,
 		},
 		ID: stack.ID,
