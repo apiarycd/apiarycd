@@ -6,10 +6,10 @@ import (
 
 	_ "github.com/apiarycd/apiarycd/internal/server/docs" // This is required for swagger docs
 	"github.com/apiarycd/apiarycd/internal/server/handlers/stacks"
-	"github.com/apiarycd/apiarycd/internal/server/validation"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/handler"
 	"github.com/go-core-fx/fiberfx/health"
+	"github.com/go-core-fx/fiberfx/validation"
 	"github.com/go-core-fx/logger"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"

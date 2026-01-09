@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/apiarycd/apiarycd/internal/deployments"
-	"github.com/apiarycd/apiarycd/internal/server/validation"
 	"github.com/apiarycd/apiarycd/internal/stacks"
 	"github.com/go-core-fx/fiberfx/handler"
+	"github.com/go-core-fx/fiberfx/validation"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/samber/lo"

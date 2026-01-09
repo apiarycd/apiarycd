@@ -12,14 +12,13 @@ import (
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
 	"github.com/capcom6/go-infra-fx/validator"
 	"github.com/go-core-fx/fiberfx"
-	"github.com/go-core-fx/fiberfx/health"
 	"github.com/go-core-fx/healthfx"
 	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
-func Run() {
+func Run(version healthfx.Version) {
 	fx.New(
 		// CORE MODULES
 		logger.Module(),
@@ -36,7 +35,7 @@ func Run() {
 		swarm.Module(),
 		//
 		// BUSINESS MODULES
-		fx.Provide(func() health.Version { return health.Version{Version: "0.0.1", ReleaseID: 1} }),
+		fx.Supply(version),
 		stacks.Module(),
 		deployments.Module(),
 		//

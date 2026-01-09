@@ -381,6 +381,22 @@ const docTemplate = `{
                 "cancelled",
                 "rolled_back"
             ],
+            "x-enum-comments": {
+                "StatusCancelled": "Deployment was cancelled",
+                "StatusFailed": "Deployment failed",
+                "StatusPending": "Deployment has not started",
+                "StatusRolledBack": "Deployment was rolled back",
+                "StatusRunning": "Deployment is in progress",
+                "StatusSuccess": "Deployment completed successfully"
+            },
+            "x-enum-descriptions": [
+                "Deployment has not started",
+                "Deployment is in progress",
+                "Deployment completed successfully",
+                "Deployment failed",
+                "Deployment was cancelled",
+                "Deployment was rolled back"
+            ],
             "x-enum-varnames": [
                 "StatusPending",
                 "StatusRunning",
