@@ -32,6 +32,10 @@ jobs:
         with:
           go-version: stable
 
+      # RELEASE_ID: Days since project inception (2026-01-02)
+      - name: Set RELEASE_ID env
+        run: echo RELEASE_ID=$(( ($(date +%s) - $(date -d "2026-01-02" +%s)) / 86400 )) >> ${GITHUB_ENV}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         env:
