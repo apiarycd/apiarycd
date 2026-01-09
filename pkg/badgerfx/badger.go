@@ -6,6 +6,8 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
+const SeekEnd = byte(0xFF)
+
 func New(config Config, logger *zapLogger) (*badger.DB, error) {
 	opts := config.Build().
 		WithLogger(logger)
