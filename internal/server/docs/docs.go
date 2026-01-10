@@ -422,7 +422,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "password"
                 },
                 "username": {
                     "type": "string"
