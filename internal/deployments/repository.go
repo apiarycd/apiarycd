@@ -147,7 +147,12 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Deplo
 		}
 
 		if deployment.StackID != old.StackID {
-			return fmt.Errorf("cannot change deployment StackID (old=%s new=%s)", old.StackID, deployment.StackID)
+			return fmt.Errorf(
+				"%w: cannot change deployment StackID (old=%s new=%s)",
+				ErrNotAllowed,
+				old.StackID,
+				deployment.StackID,
+			)
 		}
 
 		model := newDeploymentModel(&deployment.DeploymentDraft)
@@ -206,10 +211,20 @@ func (r *Repository) UpdateDual(
 		}
 
 		if firstDeployment.StackID != oldFirst.StackID {
-			return fmt.Errorf("cannot change deployment StackID (first old=%s new=%s)", oldFirst.StackID, firstDeployment.StackID)
+			return fmt.Errorf(
+				"%w: cannot change deployment StackID (first old=%s new=%s)",
+				ErrNotAllowed,
+				oldFirst.StackID,
+				firstDeployment.StackID,
+			)
 		}
 		if secondDeployment.StackID != oldSecond.StackID {
-			return fmt.Errorf("cannot change deployment StackID (second old=%s new=%s)", oldSecond.StackID, secondDeployment.StackID)
+			return fmt.Errorf(
+				"%w: cannot change deployment StackID (second old=%s new=%s)",
+				ErrNotAllowed,
+				oldSecond.StackID,
+				secondDeployment.StackID,
+			)
 		}
 
 		firstDeploymentModel := newDeploymentUpdateModel(oldFirst, &firstDeployment.DeploymentDraft)
