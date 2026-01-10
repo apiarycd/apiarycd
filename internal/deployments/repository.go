@@ -146,6 +146,10 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Deplo
 			return fmt.Errorf("failed to update deployment: %w", updErr)
 		}
 
+		if deployment.StackID != old.StackID {
+			return fmt.Errorf("cannot change deployment StackID (old=%s new=%s)", old.StackID, deployment.StackID)
+		}
+
 		model := newDeploymentModel(&deployment.DeploymentDraft)
 		model.ID = old.ID
 		model.CreatedAt = old.CreatedAt
@@ -199,6 +203,13 @@ func (r *Repository) UpdateDual(
 
 		if updErr := updater(firstDeployment, secondDeployment); updErr != nil {
 			return fmt.Errorf("failed to update deployments: %w", updErr)
+		}
+
+		if firstDeployment.StackID != oldFirst.StackID {
+			return fmt.Errorf("cannot change deployment StackID (first old=%s new=%s)", oldFirst.StackID, firstDeployment.StackID)
+		}
+		if secondDeployment.StackID != oldSecond.StackID {
+			return fmt.Errorf("cannot change deployment StackID (second old=%s new=%s)", oldSecond.StackID, secondDeployment.StackID)
 		}
 
 		firstDeploymentModel := newDeploymentUpdateModel(oldFirst, &firstDeployment.DeploymentDraft)
@@ -399,7 +410,7 @@ func (r *Repository) getStackPrefix(stackID uuid.UUID) []byte {
 
 // createIndexes creates indexes for a deployment.
 func (r *Repository) createIndexes(txn *badger.Txn, deployment *deploymentModel) error {
-	// Stack ID index `deployment:stack_id:created_at`
+	// Stack ID index `deployment:stack:<stack_id>:<unix_nano>`
 	stackKey := []byte(
 		prefixByStack + deployment.StackID.String() + ":" + strconv.FormatInt(deployment.CreatedAt.UnixNano(), 10),
 	)
