@@ -302,7 +302,7 @@ func (h *Handler) history(c *fiber.Ctx) error {
 //	@Accept			json
 //	@Produce		json
 //	@Param			id	path		string	true	"Stack ID"
-//	@Success		200	{object}	StackResponse
+//	@Success		200	{object}	DeploymentResponse
 //	@Failure		400	{object}	fiberfx.ErrorResponse
 //	@Failure		404	{object}	fiberfx.ErrorResponse
 //	@Router			/stacks/{id}/rollback [post]
@@ -337,8 +337,11 @@ func (h *Handler) errorsHandler(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusConflict, err.Error())
 	}
 
-	if errors.Is(err, deployments.ErrNotFound) {
+	switch {
+	case errors.Is(err, deployments.ErrNotFound):
 		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	case errors.Is(err, deployments.ErrNotAllowed):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	return err //nolint:wrapcheck //already wrapped
