@@ -351,7 +351,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/stacks.StackResponse"
+                            "$ref": "#/definitions/stacks.DeploymentResponse"
                         }
                     },
                     "400": {
