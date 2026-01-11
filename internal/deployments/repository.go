@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
@@ -35,25 +34,8 @@ func NewRepository(db *badger.DB) *Repository {
 func (r *Repository) Create(_ context.Context, deployment *DeploymentDraft) (*Deployment, error) {
 	model := newDeploymentModel(deployment)
 
-	// Serialize the deployment
-	data, err := json.Marshal(model)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal deployment: %w", err)
-	}
-
-	err = r.db.Update(func(txn *badger.Txn) error {
-		// Store the deployment
-		key := r.getKey(model.ID)
-		if setErr := txn.Set(key, data); setErr != nil {
-			return fmt.Errorf("failed to store deployment: %w", setErr)
-		}
-
-		// Create indexes
-		if crErr := r.createIndexes(txn, model); crErr != nil {
-			return fmt.Errorf("failed to create deployment indexes: %w", crErr)
-		}
-
-		return nil
+	err := r.db.Update(func(txn *badger.Txn) error {
+		return r.write(txn, model)
 	})
 
 	if err != nil {
@@ -90,7 +72,7 @@ func (r *Repository) GetLatestByStack(
 	err := r.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Reverse = true
-		opts.PrefetchSize = 2
+		opts.PrefetchSize = 5
 
 		it := txn.NewIterator(opts)
 		defer it.Close()
@@ -118,7 +100,7 @@ func (r *Repository) GetLatestByStack(
 
 				return nil
 			}); err != nil {
-				return fmt.Errorf("failed to unmarshal deployment: %w", err)
+				return err //nolint:wrapcheck // already wrapped
 			}
 		}
 
@@ -160,21 +142,8 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Deplo
 		model.CreatedAt = old.CreatedAt
 		model.UpdatedAt = time.Now()
 
-		// Serialize the deployment
-		data, err := json.Marshal(model)
-		if err != nil {
-			return fmt.Errorf("failed to marshal deployment: %w", err)
-		}
-
-		// Update the deployment
-		key := r.getKey(deployment.ID)
-		if setErr := txn.Set(key, data); setErr != nil {
-			return fmt.Errorf("failed to update deployment: %w", setErr)
-		}
-
-		// Update indexes
-		if crErr := r.createIndexes(txn, model); crErr != nil {
-			return fmt.Errorf("failed to update deployment indexes: %w", crErr)
+		if writeErr := r.write(txn, model); writeErr != nil {
+			return writeErr
 		}
 
 		return nil
@@ -192,6 +161,10 @@ func (r *Repository) UpdateDual(
 	first, second uuid.UUID,
 	updater func(*Deployment, *Deployment) error,
 ) error {
+	if first == second {
+		return fmt.Errorf("%w: cannot update the same deployment twice (id=%s)", ErrNotAllowed, first)
+	}
+
 	err := r.db.Update(func(txn *badger.Txn) error {
 		oldFirst, err := r.getByID(txn, first)
 		if err != nil {
@@ -255,7 +228,7 @@ func (r *Repository) write(txn *badger.Txn, deployment *deploymentModel) error {
 		return fmt.Errorf("failed to marshal deployment: %w", err)
 	}
 
-	// Update the deployment
+	// Store the deployment
 	key := r.getKey(deployment.ID)
 	if setErr := txn.Set(key, data); setErr != nil {
 		return fmt.Errorf("failed to update deployment: %w", setErr)
@@ -305,7 +278,7 @@ func (r *Repository) List(_ context.Context) ([]Deployment, error) {
 
 	err := r.db.View(func(txn *badger.Txn) error {
 		var err error
-		deployments, err = r.list(txn, false, nil)
+		deployments, err = r.list(txn, nil)
 		return err
 	})
 
@@ -316,12 +289,11 @@ func (r *Repository) List(_ context.Context) ([]Deployment, error) {
 	return deployments, nil
 }
 
-func (r *Repository) list(txn *badger.Txn, reverse bool, predicate func(*Deployment) bool) ([]Deployment, error) {
+func (r *Repository) list(txn *badger.Txn, predicate func(*Deployment) bool) ([]Deployment, error) {
 	var deployments []Deployment
 
 	opts := badger.DefaultIteratorOptions
 	opts.PrefetchSize = 10
-	opts.Reverse = reverse
 
 	it := txn.NewIterator(opts)
 	defer it.Close()
@@ -381,7 +353,7 @@ func (r *Repository) ListByStack(_ context.Context, stackID uuid.UUID) ([]Deploy
 
 				return nil
 			}); err != nil {
-				return fmt.Errorf("failed to unmarshal deployment: %w", err)
+				return fmt.Errorf("failed to read stack deployment entry: %w", err)
 			}
 		}
 
@@ -426,9 +398,9 @@ func (r *Repository) getStackPrefix(stackID uuid.UUID) []byte {
 // createIndexes creates indexes for a deployment.
 func (r *Repository) createIndexes(txn *badger.Txn, deployment *deploymentModel) error {
 	// Stack ID index `deployment:stack:<stack_id>:<unix_nano>`
-	stackKey := []byte(
-		prefixByStack + deployment.StackID.String() + ":" + strconv.FormatInt(deployment.CreatedAt.UnixNano(), 10),
-	)
+	stackKey :=
+		fmt.Appendf(nil, "%s%s:%020d", prefixByStack, deployment.StackID.String(), deployment.CreatedAt.UnixNano())
+
 	stackData, err := json.Marshal(deployment.ID)
 	if err != nil {
 		return fmt.Errorf("failed to marshal deployment ID: %w", err)
@@ -443,9 +415,9 @@ func (r *Repository) createIndexes(txn *badger.Txn, deployment *deploymentModel)
 // removeIndexes removes indexes for a deployment.
 func (r *Repository) removeIndexes(txn *badger.Txn, deployment *deploymentModel) error {
 	// Stack ID index
-	stackKey := []byte(
-		prefixByStack + deployment.StackID.String() + ":" + strconv.FormatInt(deployment.CreatedAt.UnixNano(), 10),
-	)
+	stackKey :=
+		fmt.Appendf(nil, "%s%s:%020d", prefixByStack, deployment.StackID.String(), deployment.CreatedAt.UnixNano())
+
 	if err := txn.Delete(stackKey); err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 		return fmt.Errorf("failed to delete stack index: %w", err)
 	}
