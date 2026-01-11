@@ -90,7 +90,7 @@ func (r *Repository) GetLatestByStack(
 	err := r.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Reverse = true
-		opts.PrefetchSize = 2
+		opts.PrefetchSize = 5
 
 		it := txn.NewIterator(opts)
 		defer it.Close()
@@ -118,7 +118,7 @@ func (r *Repository) GetLatestByStack(
 
 				return nil
 			}); err != nil {
-				return fmt.Errorf("failed to unmarshal deployment: %w", err)
+				return err //nolint:wrapcheck // already wrapped
 			}
 		}
 
@@ -160,21 +160,8 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Deplo
 		model.CreatedAt = old.CreatedAt
 		model.UpdatedAt = time.Now()
 
-		// Serialize the deployment
-		data, err := json.Marshal(model)
-		if err != nil {
-			return fmt.Errorf("failed to marshal deployment: %w", err)
-		}
-
-		// Update the deployment
-		key := r.getKey(deployment.ID)
-		if setErr := txn.Set(key, data); setErr != nil {
-			return fmt.Errorf("failed to update deployment: %w", setErr)
-		}
-
-		// Update indexes
-		if crErr := r.createIndexes(txn, model); crErr != nil {
-			return fmt.Errorf("failed to update deployment indexes: %w", crErr)
+		if writeErr := r.write(txn, model); writeErr != nil {
+			return writeErr
 		}
 
 		return nil
@@ -192,6 +179,10 @@ func (r *Repository) UpdateDual(
 	first, second uuid.UUID,
 	updater func(*Deployment, *Deployment) error,
 ) error {
+	if first == second {
+		return fmt.Errorf("%w: cannot update the same deployment twice (id=%s)", ErrNotAllowed, first)
+	}
+
 	err := r.db.Update(func(txn *badger.Txn) error {
 		oldFirst, err := r.getByID(txn, first)
 		if err != nil {
@@ -255,7 +246,7 @@ func (r *Repository) write(txn *badger.Txn, deployment *deploymentModel) error {
 		return fmt.Errorf("failed to marshal deployment: %w", err)
 	}
 
-	// Update the deployment
+	// Store the deployment
 	key := r.getKey(deployment.ID)
 	if setErr := txn.Set(key, data); setErr != nil {
 		return fmt.Errorf("failed to update deployment: %w", setErr)
