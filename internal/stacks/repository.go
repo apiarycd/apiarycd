@@ -32,13 +32,13 @@ func NewRepository(db *badger.DB) *Repository {
 }
 
 // Create creates a new stack.
-func (r *Repository) Create(_ context.Context, stack *StackDraft) error {
+func (r *Repository) Create(_ context.Context, stack *StackDraft) (*Stack, error) {
 	model := newStackModel(stack)
 
 	// Serialize the stack
 	data, err := json.Marshal(model)
 	if err != nil {
-		return fmt.Errorf("failed to marshal stack: %w", err)
+		return nil, fmt.Errorf("failed to marshal stack: %w", err)
 	}
 
 	err = r.db.Update(func(txn *badger.Txn) error {
@@ -65,10 +65,10 @@ func (r *Repository) Create(_ context.Context, stack *StackDraft) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to create stack: %w", err)
+		return nil, fmt.Errorf("failed to create stack: %w", err)
 	}
 
-	return nil
+	return newStack(model), nil
 }
 
 // GetByID retrieves a stack by its ID.
@@ -175,8 +175,8 @@ func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Stack
 	return nil
 }
 
-// DeleteStack deletes a stack.
-func (r *Repository) DeleteStack(_ context.Context, id uuid.UUID) error {
+// Delete deletes a stack.
+func (r *Repository) Delete(_ context.Context, id uuid.UUID) error {
 	err := r.db.Update(func(txn *badger.Txn) error {
 		// First, get the stack to remove indexes
 		stack, err := r.getByID(txn, id)

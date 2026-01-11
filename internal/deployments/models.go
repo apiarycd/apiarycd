@@ -20,8 +20,7 @@ type deploymentModel struct {
 	Message string `json:"message"` // Git commit message
 
 	// Deployment Configuration
-	Variables   map[string]string `json:"variables"`   // Deployment-specific variables
-	Environment string            `json:"environment"` // Environment name (prod, staging, etc.)
+	Variables map[string]string `json:"variables"` // Deployment-specific variables
 
 	// Status
 	Status      Status     `json:"status"`       // pending, running, success, failed, cancelled
@@ -30,11 +29,10 @@ type deploymentModel struct {
 	Error       string     `json:"error"`        // Error message if failed
 
 	// Logs and Metrics
-	Logs        []string `json:"logs"`         // Deployment logs
-	HealthCheck string   `json:"health_check"` // Health check URL or command
+	Logs []string `json:"logs"` // Deployment logs
 
 	// Rollback Information
-	RollbackFrom *uuid.UUID `json:"rollback_from"` // Previous deployment ID for rollback
+	PreviousDeployment *uuid.UUID `json:"previous_deployment"` // Previous deployment ID for rollback
 }
 
 func newDeploymentModel(draft *DeploymentDraft) *deploymentModel {
@@ -49,20 +47,27 @@ func newDeploymentModel(draft *DeploymentDraft) *deploymentModel {
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
-		StackID:      draft.StackID,
-		Version:      draft.Version,
-		GitRef:       draft.GitRef,
-		Message:      draft.Message,
-		Variables:    draft.Variables,
-		Environment:  draft.Environment,
-		Status:       draft.Status,
-		StartedAt:    draft.StartedAt,
-		CompletedAt:  draft.CompletedAt,
-		Error:        draft.Error,
-		Logs:         draft.Logs,
-		HealthCheck:  draft.HealthCheck,
-		RollbackFrom: draft.RollbackFrom,
+		StackID:            draft.StackID,
+		Version:            draft.Version,
+		GitRef:             draft.GitRef,
+		Message:            draft.Message,
+		Variables:          draft.Variables,
+		Status:             draft.Status,
+		StartedAt:          draft.StartedAt,
+		CompletedAt:        draft.CompletedAt,
+		Error:              draft.Error,
+		Logs:               draft.Logs,
+		PreviousDeployment: draft.PreviousDeployment,
 	}
+}
+
+func newDeploymentUpdateModel(source *deploymentModel, draft *DeploymentDraft) *deploymentModel {
+	updated := newDeploymentModel(draft)
+	updated.ID = source.ID
+	updated.CreatedAt = source.CreatedAt
+	updated.UpdatedAt = time.Now()
+
+	return updated
 }
 
 func newDeployment(model *deploymentModel) *Deployment {
@@ -72,19 +77,17 @@ func newDeployment(model *deploymentModel) *Deployment {
 
 	return &Deployment{
 		DeploymentDraft: DeploymentDraft{
-			StackID:      model.StackID,
-			Version:      model.Version,
-			GitRef:       model.GitRef,
-			Message:      model.Message,
-			Variables:    model.Variables,
-			Environment:  model.Environment,
-			Status:       model.Status,
-			StartedAt:    model.StartedAt,
-			CompletedAt:  model.CompletedAt,
-			Error:        model.Error,
-			Logs:         model.Logs,
-			HealthCheck:  model.HealthCheck,
-			RollbackFrom: model.RollbackFrom,
+			StackID:            model.StackID,
+			Version:            model.Version,
+			GitRef:             model.GitRef,
+			Message:            model.Message,
+			Variables:          model.Variables,
+			Status:             model.Status,
+			StartedAt:          model.StartedAt,
+			CompletedAt:        model.CompletedAt,
+			Error:              model.Error,
+			Logs:               model.Logs,
+			PreviousDeployment: model.PreviousDeployment,
 		},
 		ID:        model.ID,
 		CreatedAt: model.CreatedAt,
