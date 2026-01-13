@@ -42,13 +42,16 @@ func Module() fx.Option {
 			return v
 		}),
 		fx.Provide(
-			fx.Annotate(health.NewHandler, fx.ResultTags(`group:"handlers"`)), fx.Private,
+			fx.Annotate(health.NewHandler, fx.ResultTags(`name:"health-handler"`)), fx.Private,
 			fx.Annotate(stacks.NewHandler, fx.ResultTags(`group:"handlers"`)), fx.Private,
 		),
 
 		fx.Invoke(
 			fx.Annotate(
-				func(handlers []handler.Handler, app *fiber.App) {
+				func(handlers []handler.Handler, healthHandler handler.Handler, app *fiber.App) {
+					// Health endpoint
+					healthHandler.Register(app)
+
 					// Swagger documentation
 					app.Get("/swagger/*", fiberSwagger.WrapHandler)
 
@@ -60,7 +63,7 @@ func Module() fx.Option {
 						h.Register(v1)
 					}
 				},
-				fx.ParamTags(`group:"handlers"`),
+				fx.ParamTags(`group:"handlers"`, `name:"health-handler"`),
 			),
 		),
 	)
