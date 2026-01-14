@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"strings"
 
-	_ "github.com/apiarycd/apiarycd/internal/server/docs" // This is required for swagger docs
+	"github.com/apiarycd/apiarycd/internal/server/docs"
 	"github.com/apiarycd/apiarycd/internal/server/handlers/stacks"
+	"github.com/apiarycd/apiarycd/pkg/openapifx"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/handler"
 	"github.com/go-core-fx/fiberfx/health"
@@ -13,7 +14,6 @@ import (
 	"github.com/go-core-fx/logger"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
-	fiberSwagger "github.com/swaggo/fiber-swagger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -29,6 +29,7 @@ func Module() fx.Option {
 			opts.WithMetrics()
 			return opts
 		}),
+		fx.Supply(docs.SwaggerInfo),
 
 		fx.Decorate(func(v *validator.Validate) *validator.Validate {
 			v.RegisterTagNameFunc(func(fld reflect.StructField) string {
@@ -48,15 +49,14 @@ func Module() fx.Option {
 
 		fx.Invoke(
 			fx.Annotate(
-				func(handlers []handler.Handler, healthHandler handler.Handler, app *fiber.App) {
+				func(handlers []handler.Handler, healthHandler handler.Handler, openapiHandler *openapifx.Handler, app *fiber.App) {
 					// Health endpoint
 					healthHandler.Register(app)
 
-					// Swagger documentation
-					app.Get("/swagger/*", fiberSwagger.WrapHandler)
-
 					// Version 1 API group
 					v1 := app.Group("/api/v1")
+					openapiHandler.Register(v1.Group("docs"))
+
 					v1.Use(validation.Middleware)
 
 					for _, h := range handlers {
