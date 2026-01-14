@@ -389,14 +389,6 @@ const docTemplate = `{
                 "StatusRunning": "Deployment is in progress",
                 "StatusSuccess": "Deployment completed successfully"
             },
-            "x-enum-descriptions": [
-                "Deployment has not started",
-                "Deployment is in progress",
-                "Deployment completed successfully",
-                "Deployment failed",
-                "Deployment was cancelled",
-                "Deployment was rolled back"
-            ],
             "x-enum-varnames": [
                 "StatusPending",
                 "StatusRunning",
