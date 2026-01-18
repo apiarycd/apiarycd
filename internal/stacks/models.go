@@ -1,13 +1,25 @@
 package stacks
 
 import (
+	"encoding/json"
+	"net/url"
 	"time"
 
 	"github.com/apiarycd/apiarycd/internal/storage"
+	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/google/uuid"
 )
 
 type Status string
+
+const (
+	prefix = "stack:"
+
+	prefixByID     = prefix + "id:"
+	prefixByName   = prefix + "name:"
+	prefixByStatus = prefix + "status:"
+	prefixByLabel  = prefix + "label:"
+)
 
 const (
 	StatusActive   Status = "active"
@@ -53,7 +65,7 @@ func newStackModel(stack *StackDraft) *stackModel {
 
 	return &stackModel{
 		BaseEntity: storage.BaseEntity{
-			ID:        uuid.New(),
+			ID:        uuid.Must(uuid.NewV7()),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -74,31 +86,73 @@ func newStackModel(stack *StackDraft) *stackModel {
 	}
 }
 
-func newStack(model *stackModel) *Stack {
-	if model == nil {
+func (s *stackModel) nameIndex() string {
+	return prefixByName + s.Name
+}
+
+// MarshalStorage implements badgerfx.Entity.
+func (s *stackModel) MarshalStorage() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+// StorageIndexes implements badgerfx.Entity.
+func (s *stackModel) StorageIndexes() []string {
+	indexes := make([]string, 0, 3+len(s.Labels))
+
+	// Name index
+	indexes = append(indexes, s.nameIndex())
+
+	// Status index
+	indexes = append(indexes, prefixByStatus+string(s.Status)+":"+s.ID.String())
+
+	// Labels index
+	for key, value := range s.Labels {
+		indexes = append(indexes, prefixByLabel+url.QueryEscape(key)+":"+url.QueryEscape(value)+":"+s.ID.String())
+	}
+
+	return indexes
+}
+
+// StorageKey implements badgerfx.Entity.
+func (s *stackModel) StorageKey(id ...string) string {
+	if len(id) > 0 {
+		return prefixByID + id[0]
+	}
+	return prefixByID + s.ID.String()
+}
+
+// UnmarshalStorage implements badgerfx.Entity.
+func (s *stackModel) UnmarshalStorage(data []byte) error {
+	return json.Unmarshal(data, s)
+}
+
+func (s *stackModel) toDomain() *Stack {
+	if s == nil {
 		return nil
 	}
 
 	return &Stack{
 		StackDraft: StackDraft{
-			Name:        model.Name,
-			Description: model.Description,
-			GitURL:      model.GitURL,
-			GitBranch:   model.GitBranch,
+			Name:        s.Name,
+			Description: s.Description,
+			GitURL:      s.GitURL,
+			GitBranch:   s.GitBranch,
 			GitAuth: GitAuth{
-				Username: model.GitAuth.Username,
-				Password: model.GitAuth.Password,
+				Username: s.GitAuth.Username,
+				Password: s.GitAuth.Password,
 			},
-			ComposePath: model.ComposePath,
-			Variables:   model.Variables,
-			Labels:      model.Labels,
+			ComposePath: s.ComposePath,
+			Variables:   s.Variables,
+			Labels:      s.Labels,
 		},
-		ID:        model.ID,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:        s.ID,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
 
-		Status:     model.Status,
-		LastSync:   model.LastSync,
-		LastDeploy: model.LastDeploy,
+		Status:     s.Status,
+		LastSync:   s.LastSync,
+		LastDeploy: s.LastDeploy,
 	}
 }
+
+var _ badgerfx.Entity = (*stackModel)(nil)
