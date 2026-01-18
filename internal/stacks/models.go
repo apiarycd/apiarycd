@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -58,11 +59,7 @@ type stackModel struct {
 	Labels map[string]string `json:"labels"` // Custom labels for filtering
 }
 
-func newStackModel(stack *StackDraft) *stackModel {
-	if stack == nil {
-		return nil
-	}
-
+func newStackModel(stack StackDraft) *stackModel {
 	return &stackModel{
 		BaseEntity: storage.BaseEntity{
 			ID:        uuid.Must(uuid.NewV7()),
@@ -92,12 +89,19 @@ func (s *stackModel) nameIndex() string {
 
 // MarshalStorage implements badgerfx.Entity.
 func (s *stackModel) MarshalStorage() ([]byte, error) {
-	return json.Marshal(s)
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal stack: %w", err)
+	}
+
+	return data, nil
 }
 
 // StorageIndexes implements badgerfx.Entity.
 func (s *stackModel) StorageIndexes() []string {
-	indexes := make([]string, 0, 3+len(s.Labels))
+	const fixedIndexCount = 2
+
+	indexes := make([]string, 0, fixedIndexCount+len(s.Labels))
 
 	// Name index
 	indexes = append(indexes, s.nameIndex())
@@ -123,7 +127,30 @@ func (s *stackModel) StorageKey(id ...string) string {
 
 // UnmarshalStorage implements badgerfx.Entity.
 func (s *stackModel) UnmarshalStorage(data []byte) error {
-	return json.Unmarshal(data, s)
+	if err := json.Unmarshal(data, s); err != nil {
+		return fmt.Errorf("failed to unmarshal stack: %w", err)
+	}
+
+	return nil
+}
+
+func (s *stackModel) update(stack StackUpdate) {
+	s.Description = stack.Description
+	s.GitURL = stack.GitURL
+	s.GitBranch = stack.GitBranch
+	s.GitAuth = gitAuth{
+		Username: stack.GitAuth.Username,
+		Password: stack.GitAuth.Password,
+	}
+	s.ComposePath = stack.ComposePath
+	s.Variables = stack.Variables
+	s.Labels = stack.Labels
+
+	s.Status = stack.Status
+	s.LastSync = stack.LastSync
+	s.LastDeploy = stack.LastDeploy
+
+	s.UpdatedAt = time.Now()
 }
 
 func (s *stackModel) toDomain() *Stack {
@@ -132,26 +159,29 @@ func (s *stackModel) toDomain() *Stack {
 	}
 
 	return &Stack{
-		StackDraft: StackDraft{
-			Name:        s.Name,
-			Description: s.Description,
-			GitURL:      s.GitURL,
-			GitBranch:   s.GitBranch,
-			GitAuth: GitAuth{
-				Username: s.GitAuth.Username,
-				Password: s.GitAuth.Password,
+		StackUpdate: StackUpdate{
+			StackDraft: StackDraft{
+				Name:        s.Name,
+				Description: s.Description,
+				GitURL:      s.GitURL,
+				GitBranch:   s.GitBranch,
+				GitAuth: GitAuth{
+					Username: s.GitAuth.Username,
+					Password: s.GitAuth.Password,
+				},
+				ComposePath: s.ComposePath,
+				Variables:   s.Variables,
+				Labels:      s.Labels,
 			},
-			ComposePath: s.ComposePath,
-			Variables:   s.Variables,
-			Labels:      s.Labels,
+
+			Status:     s.Status,
+			LastSync:   s.LastSync,
+			LastDeploy: s.LastDeploy,
 		},
+
 		ID:        s.ID,
 		CreatedAt: s.CreatedAt,
 		UpdatedAt: s.UpdatedAt,
-
-		Status:     s.Status,
-		LastSync:   s.LastSync,
-		LastDeploy: s.LastDeploy,
 	}
 }
 
