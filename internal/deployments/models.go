@@ -43,7 +43,7 @@ func newDeploymentModel(draft *DeploymentDraft) *deploymentModel {
 	now := time.Now()
 	return &deploymentModel{
 		BaseEntity: storage.BaseEntity{
-			ID:        uuid.New(),
+			ID:        uuid.Must(uuid.NewV7()),
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
