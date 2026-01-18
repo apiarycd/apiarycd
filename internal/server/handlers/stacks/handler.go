@@ -74,7 +74,7 @@ func (h *Handler) Register(r fiber.Router) {
 //
 // Create a new stack.
 func (h *Handler) post(c *fiber.Ctx, req *POSTRequest) error {
-	draft := &stacks.StackDraft{
+	draft := stacks.StackDraft{
 		Name:        req.Name,
 		Description: req.Description,
 		GitURL:      req.GitURL,

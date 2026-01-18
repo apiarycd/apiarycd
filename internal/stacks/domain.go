@@ -29,15 +29,19 @@ type StackDraft struct {
 	Labels map[string]string // Custom labels for filtering
 }
 
-type Stack struct {
+type StackUpdate struct {
 	StackDraft
-
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
 
 	// Status
 	Status     Status     // active, inactive, error
 	LastSync   *time.Time // Last successful sync
 	LastDeploy *time.Time // Last successful deployment
+}
+
+type Stack struct {
+	StackUpdate
+
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

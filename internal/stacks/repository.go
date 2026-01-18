@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/dgraph-io/badger/v4"
@@ -26,7 +25,7 @@ func NewRepository(db *badger.DB) *Repository {
 }
 
 // Create creates a new stack.
-func (r *Repository) Create(_ context.Context, stack *StackDraft) (*Stack, error) {
+func (r *Repository) Create(_ context.Context, stack StackDraft) (*Stack, error) {
 	model := newStackModel(stack)
 	err := r.db.Update(func(txn *badger.Txn) error {
 		_, err := r.storage.ReadByIndex(txn, model.nameIndex())
@@ -37,8 +36,8 @@ func (r *Repository) Create(_ context.Context, stack *StackDraft) (*Stack, error
 			return fmt.Errorf("failed to check name uniqueness: %w", err)
 		}
 
-		if err := r.storage.Write(txn, model); err != nil {
-			return err
+		if writeErr := r.storage.Write(txn, model); writeErr != nil {
+			return writeErr //nolint:wrapcheck // wrapped outside of transaction
 		}
 
 		return nil
@@ -59,7 +58,7 @@ func (r *Repository) GetByID(_ context.Context, id uuid.UUID) (*Stack, error) {
 		var err error
 		model, err = r.storage.Read(txn, id.String())
 		if err != nil {
-			return err
+			return err //nolint:wrapcheck // wrapped outside of transaction
 		}
 
 		return nil
@@ -75,28 +74,34 @@ func (r *Repository) GetByID(_ context.Context, id uuid.UUID) (*Stack, error) {
 // Update updates an existing stack.
 func (r *Repository) Update(_ context.Context, id uuid.UUID, updater func(*Stack) error) error {
 	err := r.db.Update(func(txn *badger.Txn) error {
-		old, err := r.storage.Read(txn, id.String())
+		model, err := r.storage.Read(txn, id.String())
 		if err != nil {
 			return fmt.Errorf("failed to get stack before update: %w", err)
 		}
 
-		stack := old.toDomain()
+		if indexErr := r.storage.DeleteIndexes(txn, model); indexErr != nil {
+			return fmt.Errorf("failed to update stack indexes: %w", indexErr)
+		}
+
+		stack := model.toDomain()
 
 		if updErr := updater(stack); updErr != nil {
 			return fmt.Errorf("failed to update stack: %w", updErr)
 		}
 
-		model := newStackModel(&stack.StackDraft)
-		model.ID = old.ID
-		model.CreatedAt = old.CreatedAt
-		model.UpdatedAt = time.Now()
-
-		if indexErr := r.storage.DeleteIndexes(txn, old); indexErr != nil {
-			return indexErr
+		if model.Name != stack.Name {
+			return fmt.Errorf(
+				"%w: cannot change stack name (old=%s new=%s)",
+				ErrNotAllowed,
+				model.Name,
+				stack.Name,
+			)
 		}
 
+		model.update(stack.StackUpdate)
+
 		if writeErr := r.storage.Write(txn, model); writeErr != nil {
-			return writeErr
+			return writeErr //nolint:wrapcheck // wrapped outside of transaction
 		}
 
 		return nil
@@ -129,9 +134,10 @@ func (r *Repository) List(_ context.Context) ([]Stack, error) {
 	err := r.db.View(func(txn *badger.Txn) error {
 		items, err := r.storage.List(txn, prefixByID, badger.DefaultIteratorOptions)
 		if err != nil {
-			return err
+			return err //nolint:wrapcheck // wrapped outside of transaction
 		}
 
+		stacks = make([]Stack, 0, len(items))
 		for _, item := range items {
 			stacks = append(stacks, *item.toDomain())
 		}

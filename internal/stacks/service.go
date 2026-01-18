@@ -20,7 +20,7 @@ func NewService(stacks *Repository, logger *zap.Logger) *Service {
 	}
 }
 
-func (s *Service) Create(ctx context.Context, draft *StackDraft) (*Stack, error) {
+func (s *Service) Create(ctx context.Context, draft StackDraft) (*Stack, error) {
 	s.logger.Info("creating stack", zap.String("name", draft.Name))
 
 	stack, err := s.stacks.Create(ctx, draft)
