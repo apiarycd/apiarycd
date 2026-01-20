@@ -284,6 +284,7 @@ linters:
         - ^gopkg.in/yaml.v3.Node$
         - ^gorm.io/gorm/clause.+$
         - ^github.com/moby/moby/client.+Options$
+        - ^github.com/go-git/go-git/.+Options$
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true

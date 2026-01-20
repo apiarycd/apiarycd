@@ -36,11 +36,17 @@ type dockerConfig struct {
 	KeyFile    string        `koanf:"key_file"`
 }
 
+type gitConfig struct {
+	Timeout    time.Duration `koanf:"timeout"`
+	DefaultDir string        `koanf:"default_dir"`
+}
+
 type Config struct {
 	HTTP http `koanf:"http"`
 
 	Storage storageConfig `koanf:"storage"`
 	Docker  dockerConfig  `koanf:"docker"`
+	Git     gitConfig     `koanf:"git"`
 }
 
 func Default() Config {
@@ -60,6 +66,11 @@ func Default() Config {
 			Host:       "",
 			APIVersion: "",
 			Timeout:    30 * time.Second,
+		},
+
+		Git: gitConfig{
+			Timeout:    30 * time.Second,
+			DefaultDir: "./repos",
 		},
 	}
 }
