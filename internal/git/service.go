@@ -11,18 +11,88 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/go-git/go-git/v6/plumbing/transport"
+	"github.com/go-git/go-git/v6/plumbing/transport/http"
+	gitssh "github.com/go-git/go-git/v6/plumbing/transport/ssh"
 	"go.uber.org/zap"
 )
 
 type Service struct {
+	config Config
+
 	logger *zap.Logger
 }
 
 // NewService creates a new GitService.
-func NewService(logger *zap.Logger) *Service {
+func NewService(config Config, logger *zap.Logger) *Service {
 	return &Service{
+		config: config,
+
 		logger: logger,
 	}
+}
+
+// buildAuth converts an Authenticator to a go-git authentication object.
+func (s *Service) buildAuth(auth Authenticator) (transport.AuthMethod, error) {
+	if auth == nil {
+		return nil, nil
+	}
+
+	switch a := auth.(type) {
+	case *SSHAuth:
+		return s.buildSSHAuth(a)
+	case *HTTPSAuth:
+		return s.buildHTTPSAuth(a)
+	default:
+		return nil, fmt.Errorf("unsupported authentication type: %s", auth.Type())
+	}
+}
+
+// buildSSHAuth builds SSH authentication for go-git.
+func (s *Service) buildSSHAuth(auth *SSHAuth) (*gitssh.PublicKeys, error) {
+	privateKeyPath := auth.PrivateKeyPath
+	if privateKeyPath == "" {
+		privateKeyPath = s.config.Auth.SSH.DefaultPrivateKey
+	}
+
+	if privateKeyPath == "" {
+		return nil, fmt.Errorf("SSH private key path is required")
+	}
+
+	keys, err := gitssh.NewPublicKeysFromFile("git", privateKeyPath, auth.Passphrase)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load SSH private key: %w", err)
+	}
+
+	return keys, nil
+}
+
+// buildHTTPSAuth builds HTTPS authentication for go-git.
+func (s *Service) buildHTTPSAuth(auth *HTTPSAuth) (*http.BasicAuth, error) {
+	if auth.Token != "" {
+		// For GitHub/GitLab tokens, use token as password, username can be anything
+		return &http.BasicAuth{
+			Username: "git", // or auth.Username if provided
+			Password: auth.Token,
+		}, nil
+	}
+
+	if auth.Username != "" && auth.Password != "" {
+		return &http.BasicAuth{
+			Username: auth.Username,
+			Password: auth.Password,
+		}, nil
+	}
+
+	// Try default token from config
+	if s.config.Auth.HTTPS.DefaultToken != "" {
+		return &http.BasicAuth{
+			Username: s.config.Auth.HTTPS.DefaultUsername,
+			Password: s.config.Auth.HTTPS.DefaultToken,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("HTTPS authentication requires token or username/password")
 }
 
 // Clone clones a repository to the specified directory.
@@ -40,6 +110,15 @@ func (s *Service) Clone(ctx context.Context, req CloneRequest) (*Repository, err
 
 	if req.Branch != "" {
 		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(req.Branch)
+	}
+
+	// Set up authentication
+	if req.Auth != nil {
+		auth, err := s.buildAuth(req.Auth)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build authentication: %w", err)
+		}
+		cloneOptions.Auth = auth
 	}
 
 	// Check if directory already exists
@@ -63,13 +142,13 @@ func (s *Service) Clone(ctx context.Context, req CloneRequest) (*Repository, err
 	}, nil
 }
 
-// Pull pulls the latest changes for the specified branch.
-func (s *Service) Pull(ctx context.Context, repoPath, branch string) error {
+// Pull pulls the latest changes for the specified repository.
+func (s *Service) Pull(ctx context.Context, req PullRequest) error {
 	s.logger.Info("pulling repository",
-		zap.String("path", repoPath),
-		zap.String("branch", branch))
+		zap.String("path", req.Path),
+		zap.String("branch", req.Branch))
 
-	repo, err := git.PlainOpen(repoPath)
+	repo, err := git.PlainOpen(req.Path)
 	if err != nil {
 		s.logger.Error("failed to open repository", zap.Error(err))
 		return fmt.Errorf("%w: %w", ErrRepositoryNotFound, err)
@@ -87,8 +166,17 @@ func (s *Service) Pull(ctx context.Context, repoPath, branch string) error {
 		Depth:        1,
 	}
 
-	if branch != "" {
-		pullOptions.ReferenceName = plumbing.NewBranchReferenceName(branch)
+	if req.Branch != "" {
+		pullOptions.ReferenceName = plumbing.NewBranchReferenceName(req.Branch)
+	}
+
+	// Set up authentication
+	if req.Auth != nil {
+		auth, err := s.buildAuth(req.Auth)
+		if err != nil {
+			return fmt.Errorf("failed to build authentication: %w", err)
+		}
+		pullOptions.Auth = auth
 	}
 
 	err = worktree.PullContext(ctx, pullOptions)
@@ -98,7 +186,7 @@ func (s *Service) Pull(ctx context.Context, repoPath, branch string) error {
 	}
 
 	s.logger.Info("repository pulled successfully",
-		zap.String("path", repoPath))
+		zap.String("path", req.Path))
 
 	return nil
 }

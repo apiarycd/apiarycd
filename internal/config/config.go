@@ -36,9 +36,24 @@ type dockerConfig struct {
 	KeyFile    string        `koanf:"key_file"`
 }
 
+type gitAuthConfig struct {
+	SSH   gitSSHAuthConfig   `koanf:"ssh"`
+	HTTPS gitHTTPSAuthConfig `koanf:"https"`
+}
+
+type gitSSHAuthConfig struct {
+	DefaultPrivateKey string `koanf:"default_private_key"`
+}
+
+type gitHTTPSAuthConfig struct {
+	DefaultToken    string `koanf:"default_token"`
+	DefaultUsername string `koanf:"default_username"`
+}
+
 type gitConfig struct {
 	Timeout    time.Duration `koanf:"timeout"`
 	DefaultDir string        `koanf:"default_dir"`
+	Auth       gitAuthConfig `koanf:"auth"`
 }
 
 type Config struct {
