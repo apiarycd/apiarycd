@@ -47,17 +47,27 @@ func (a *HTTPSAuth) Type() string {
 
 // CloneRequest represents the request to clone a repository.
 type CloneRequest struct {
-	URL       string        // Git repository URL
-	Branch    string        // Branch to clone (optional, defaults to default branch)
-	Directory string        // Directory to clone into
-	Auth      Authenticator // Authentication method (optional)
+	URL           string           // Git repository URL
+	Branch        string           // Branch to clone (optional, defaults to default branch)
+	Directory     string           // Directory to clone into
+	Auth          Authenticator    // Authentication method (optional)
+	Depth         *int             // Shallow clone depth (optional, nil for full clone)
+	SingleBranch  bool             // Clone only the specified branch
+	Progress      ProgressCallback // Progress callback (optional)
+	Timeout       *time.Duration   // Operation timeout (optional)
+	Validate      bool             // Validate repository after cloning
+	RetryAttempts int              // Number of retry attempts on failure
 }
 
 // PullRequest represents the request to pull a repository.
 type PullRequest struct {
-	Path   string        // Path to the repository
-	Branch string        // Branch to pull (optional)
-	Auth   Authenticator // Authentication method (optional)
+	Path          string           // Path to the repository
+	Branch        string           // Branch to pull (optional)
+	Auth          Authenticator    // Authentication method (optional)
+	Force         bool             // Force pull (discard local changes)
+	Progress      ProgressCallback // Progress callback (optional)
+	Timeout       *time.Duration   // Operation timeout (optional)
+	RetryAttempts int              // Number of retry attempts on failure
 }
 
 // BranchInfo represents information about a Git branch.
@@ -79,3 +89,6 @@ type FileContent struct {
 	Path    string // File path
 	Content string // File content
 }
+
+// ProgressCallback is a callback function for reporting progress during Git operations.
+type ProgressCallback func(progress string)
