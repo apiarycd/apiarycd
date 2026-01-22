@@ -29,8 +29,13 @@ const (
 )
 
 type gitAuth struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Type     string `json:"type"`     // Authentication type: "none", "https", "ssh"
+	Username string `json:"username"` // Username for HTTPS auth
+	Password string `json:"password"` // Password or token for HTTPS auth
+
+	// SSH-specific fields
+	PrivateKeyPath string `json:"private_key_path,omitempty"` // Path to SSH private key
+	Passphrase     string `json:"passphrase,omitempty"`       // Passphrase for encrypted SSH key
 }
 
 // stackModel represents a GitOps stack configuration.
@@ -71,8 +76,11 @@ func newStackModel(stack StackDraft) *stackModel {
 		GitURL:      stack.GitURL,
 		GitBranch:   stack.GitBranch,
 		GitAuth: gitAuth{
-			Username: stack.GitAuth.Username,
-			Password: stack.GitAuth.Password,
+			Type:           string(stack.GitAuth.Type),
+			Username:       stack.GitAuth.Username,
+			Password:       stack.GitAuth.Password,
+			PrivateKeyPath: stack.GitAuth.PrivateKeyPath,
+			Passphrase:     stack.GitAuth.Passphrase,
 		},
 		ComposePath: stack.ComposePath,
 		Variables:   stack.Variables,
@@ -139,8 +147,11 @@ func (s *stackModel) update(stack StackUpdate) {
 	s.GitURL = stack.GitURL
 	s.GitBranch = stack.GitBranch
 	s.GitAuth = gitAuth{
-		Username: stack.GitAuth.Username,
-		Password: stack.GitAuth.Password,
+		Type:           string(stack.GitAuth.Type),
+		Username:       stack.GitAuth.Username,
+		Password:       stack.GitAuth.Password,
+		PrivateKeyPath: stack.GitAuth.PrivateKeyPath,
+		Passphrase:     stack.GitAuth.Passphrase,
 	}
 	s.ComposePath = stack.ComposePath
 	s.Variables = stack.Variables
@@ -166,8 +177,11 @@ func (s *stackModel) toDomain() *Stack {
 				GitURL:      s.GitURL,
 				GitBranch:   s.GitBranch,
 				GitAuth: GitAuth{
-					Username: s.GitAuth.Username,
-					Password: s.GitAuth.Password,
+					Type:           GitAuthType(s.GitAuth.Type),
+					Username:       s.GitAuth.Username,
+					Password:       s.GitAuth.Password,
+					PrivateKeyPath: s.GitAuth.PrivateKeyPath,
+					Passphrase:     s.GitAuth.Passphrase,
 				},
 				ComposePath: s.ComposePath,
 				Variables:   s.Variables,

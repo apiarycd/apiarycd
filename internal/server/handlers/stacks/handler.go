@@ -80,8 +80,11 @@ func (h *Handler) post(c *fiber.Ctx, req *POSTRequest) error {
 		GitURL:      req.GitURL,
 		GitBranch:   req.GitBranch,
 		GitAuth: stacks.GitAuth{
-			Username: req.GitAuth.Username,
-			Password: req.GitAuth.Password,
+			Type:           stacks.GitAuthType(req.GitAuth.Type),
+			Username:       req.GitAuth.Username,
+			Password:       req.GitAuth.Password,
+			PrivateKeyPath: req.GitAuth.PrivateKeyPath,
+			Passphrase:     req.GitAuth.Passphrase,
 		},
 		ComposePath: req.ComposePath,
 		Variables:   req.Variables,
@@ -178,8 +181,11 @@ func (h *Handler) patch(c *fiber.Ctx, req *PATCHRequest) error {
 		}
 		if req.GitAuth != nil {
 			stack.GitAuth = stacks.GitAuth{
-				Username: req.GitAuth.Username,
-				Password: req.GitAuth.Password,
+				Type:           stacks.GitAuthType(req.GitAuth.Type),
+				Username:       req.GitAuth.Username,
+				Password:       req.GitAuth.Password,
+				PrivateKeyPath: req.GitAuth.PrivateKeyPath,
+				Passphrase:     req.GitAuth.Passphrase,
 			}
 		}
 		if req.ComposePath != nil {
@@ -335,6 +341,20 @@ func (h *Handler) errorsHandler(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, err.Error())
 	case errors.Is(err, stacks.ErrConflict):
 		return fiber.NewError(fiber.StatusConflict, err.Error())
+	case errors.Is(err, stacks.ErrGitInvalidURL):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, stacks.ErrGitAuthFailed):
+		return fiber.NewError(fiber.StatusUnauthorized, err.Error())
+	case errors.Is(err, stacks.ErrGitCloneFailed):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, stacks.ErrGitPullFailed):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, stacks.ErrGitRepositoryNotFound):
+		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	case errors.Is(err, stacks.ErrGitBranchNotFound):
+		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	case errors.Is(err, stacks.ErrGitOperationTimeout):
+		return fiber.NewError(fiber.StatusRequestTimeout, err.Error())
 	}
 
 	switch {

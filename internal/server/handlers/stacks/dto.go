@@ -7,8 +7,13 @@ import (
 )
 
 type GitAuth struct {
+	Type     string `json:"type" validate:"omitempty,oneof=none https ssh"`
 	Username string `json:"username"`
 	Password string `json:"password" format:"password"`
+
+	// SSH-specific fields
+	PrivateKeyPath string `json:"private_key_path,omitempty"`
+	Passphrase     string `json:"passphrase,omitempty" format:"password"`
 }
 
 type Stack struct {

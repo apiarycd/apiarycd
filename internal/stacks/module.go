@@ -10,6 +10,8 @@ func Module() fx.Option {
 		"stacks",
 		logger.WithNamedLogger("stacks"),
 		fx.Provide(NewRepository, fx.Private),
+		fx.Provide(NewGitAdapter),
+		fx.Provide(NewPathBuilder),
 		fx.Provide(NewService),
 	)
 }
