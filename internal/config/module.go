@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
 	"github.com/apiarycd/apiarycd/pkg/openapifx"
@@ -44,5 +45,25 @@ func Module() fx.Option {
 				PublicPath: cfg.HTTP.OpenAPI.PublicPath,
 			}
 		}),
+
+		fx.Provide(
+			func(cfg Config) repositories.Config {
+				return repositories.Config{
+					Timeout:    cfg.Repositories.Timeout,
+					StorageDir: cfg.Repositories.StorageDir,
+					Auth: repositories.GitAuth{
+						SSH: repositories.GitSSHAuth{
+							PrivateKeyPath: cfg.Repositories.DefaultAuth.SSH.PrivateKeyPath,
+							Username:       "git",
+							Password:       "",
+						},
+						HTTPS: repositories.GitHTTPSAuth{
+							Username: cfg.Repositories.DefaultAuth.HTTPS.Username,
+							Password: cfg.Repositories.DefaultAuth.HTTPS.Password,
+						},
+					},
+				}
+			},
+		),
 	)
 }

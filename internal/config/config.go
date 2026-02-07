@@ -36,11 +36,32 @@ type dockerConfig struct {
 	KeyFile    string        `koanf:"key_file"`
 }
 
+type gitAuthConfig struct {
+	SSH   gitSSHAuthConfig   `koanf:"ssh"`
+	HTTPS gitHTTPSAuthConfig `koanf:"https"`
+}
+
+type gitSSHAuthConfig struct {
+	PrivateKeyPath string `koanf:"private_key_path"`
+}
+
+type gitHTTPSAuthConfig struct {
+	Username string `koanf:"username"`
+	Password string `koanf:"password"`
+}
+
+type repositoriesConfig struct {
+	Timeout     time.Duration `koanf:"timeout"`
+	StorageDir  string        `koanf:"storage_dir"`
+	DefaultAuth gitAuthConfig `koanf:"default_auth"`
+}
+
 type Config struct {
 	HTTP http `koanf:"http"`
 
-	Storage storageConfig `koanf:"storage"`
-	Docker  dockerConfig  `koanf:"docker"`
+	Storage      storageConfig      `koanf:"storage"`
+	Docker       dockerConfig       `koanf:"docker"`
+	Repositories repositoriesConfig `koanf:"repositories"`
 }
 
 func Default() Config {
@@ -60,6 +81,12 @@ func Default() Config {
 			Host:       "",
 			APIVersion: "",
 			Timeout:    30 * time.Second,
+		},
+
+		Repositories: repositoriesConfig{
+			Timeout:     30 * time.Second,
+			StorageDir:  "./repos",
+			DefaultAuth: gitAuthConfig{},
 		},
 	}
 }

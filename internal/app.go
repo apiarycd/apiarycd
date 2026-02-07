@@ -5,6 +5,7 @@ import (
 
 	"github.com/apiarycd/apiarycd/internal/config"
 	"github.com/apiarycd/apiarycd/internal/deployments"
+	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/apiarycd/apiarycd/internal/server"
 	"github.com/apiarycd/apiarycd/internal/stacks"
 	"github.com/apiarycd/apiarycd/internal/swarm"
@@ -35,6 +36,7 @@ func Run(version healthfx.Version) {
 		config.Module(),
 		server.Module(),
 		swarm.Module(),
+		repositories.Module(),
 		//
 		// BUSINESS MODULES
 		fx.Supply(version),

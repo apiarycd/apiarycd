@@ -6,5 +6,24 @@ http:
   proxy_header: "X-Forwarded-For"
   proxies: []
 
+storage:
+  data_dir: "./data"
+
+docker:
+  host: "unix:///var/run/docker.sock"
+  api_version: "1.43"
+  timeout: "30s"
+  tls_enabled: false
+
+repositories:
+  timeout: "30s"
+  storage_dir: "./repos"
+  default_auth:
+    ssh:
+      private_key_path: "~/.ssh/id_rsa"
+    https:
+      token: "" # Personal access token for GitHub/GitLab
+      username: ""
+
 example:
   example: "example"
