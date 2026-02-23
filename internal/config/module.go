@@ -52,12 +52,12 @@ func Module() fx.Option {
 					Timeout:    cfg.Repositories.Timeout,
 					StorageDir: cfg.Repositories.StorageDir,
 					Auth: repositories.GitAuth{
-						SSH: repositories.GitSSHAuth{
+						SSH: &repositories.GitSSHAuth{
 							PrivateKeyPath: cfg.Repositories.DefaultAuth.SSH.PrivateKeyPath,
 							Username:       "git",
 							Password:       "",
 						},
-						HTTPS: repositories.GitHTTPSAuth{
+						HTTPS: &repositories.GitHTTPSAuth{
 							Username: cfg.Repositories.DefaultAuth.HTTPS.Username,
 							Password: cfg.Repositories.DefaultAuth.HTTPS.Password,
 						},
