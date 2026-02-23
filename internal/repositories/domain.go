@@ -98,8 +98,4 @@ type CloneRequest struct {
 	Auth   GitAuth   // Authentication details
 }
 
-type PullRequest struct {
-	ID     uuid.UUID // Repository ID
-	Branch string    // Branch to pull (optional, defaults to default branch)
-	Auth   GitAuth   // Authentication details
-}
+type PullRequest CloneRequest
