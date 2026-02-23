@@ -5,12 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -130,4 +132,188 @@ func createBareRemote(t *testing.T) string {
 	}
 
 	return remoteDir
+}
+
+func TestServicePull_SameBranch(t *testing.T) {
+	storageDir := t.TempDir()
+	remotePath := setupRemoteRepository(t)
+
+	svc, err := repositories.NewService(
+		repositories.Config{StorageDir: storageDir, Timeout: 5 * time.Second},
+		zap.NewNop(),
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	id := uuid.New()
+	if err = svc.Clone(
+		context.Background(),
+		repositories.CloneRequest{ID: id, URL: remotePath, Branch: "master"},
+	); err != nil {
+		t.Fatalf("Clone() error = %v", err)
+	}
+
+	if err = svc.Pull(
+		context.Background(),
+		repositories.PullRequest{ID: id, URL: remotePath, Branch: "master"},
+	); err != nil {
+		t.Fatalf("Pull() error = %v", err)
+	}
+
+	head := currentHeadBranch(t, filepath.Join(storageDir, id.String()))
+	if head != "master" {
+		t.Fatalf("expected HEAD to remain on master, got %q", head)
+	}
+}
+
+func TestServicePull_SwitchBranch(t *testing.T) {
+	storageDir := t.TempDir()
+	remotePath := setupRemoteRepository(t)
+
+	svc, err := repositories.NewService(
+		repositories.Config{StorageDir: storageDir, Timeout: 5 * time.Second},
+		zap.NewNop(),
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	id := uuid.New()
+	if err = svc.Clone(
+		context.Background(),
+		repositories.CloneRequest{ID: id, URL: remotePath, Branch: "master"},
+	); err != nil {
+		t.Fatalf("Clone() error = %v", err)
+	}
+
+	if err = svc.Pull(
+		context.Background(),
+		repositories.PullRequest{ID: id, URL: remotePath, Branch: "feature"},
+	); err != nil {
+		t.Fatalf("Pull() error = %v", err)
+	}
+
+	head := currentHeadBranch(t, filepath.Join(storageDir, id.String()))
+	if head != "feature" {
+		t.Fatalf("expected HEAD to switch to feature, got %q", head)
+	}
+}
+
+func TestServicePull_NonExistentBranch(t *testing.T) {
+	storageDir := t.TempDir()
+	remotePath := setupRemoteRepository(t)
+
+	svc, err := repositories.NewService(
+		repositories.Config{StorageDir: storageDir, Timeout: 5 * time.Second},
+		zap.NewNop(),
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	id := uuid.New()
+	if err = svc.Clone(
+		context.Background(),
+		repositories.CloneRequest{ID: id, URL: remotePath, Branch: "master"},
+	); err != nil {
+		t.Fatalf("Clone() error = %v", err)
+	}
+
+	err = svc.Pull(context.Background(), repositories.PullRequest{ID: id, URL: remotePath, Branch: "does-not-exist"})
+	if err == nil {
+		t.Fatalf("expected Pull() to fail for non-existent branch")
+	}
+
+	if !errors.Is(err, repositories.ErrBranchNotFound) {
+		t.Fatalf("expected ErrBranchNotFound, got %T (%v)", err, err)
+	}
+
+	if !strings.Contains(err.Error(), "does-not-exist") {
+		t.Fatalf("expected missing branch name in error, got %q", err.Error())
+	}
+}
+
+func setupRemoteRepository(t *testing.T) string {
+	t.Helper()
+
+	remoteDir := filepath.Join(t.TempDir(), "remote.git")
+	_, err := git.PlainInit(remoteDir, true)
+	if err != nil {
+		t.Fatalf("PlainInit(remote, bare) error = %v", err)
+	}
+
+	seedDir := filepath.Join(t.TempDir(), "seed")
+	repo, err := git.PlainInit(seedDir, false)
+	if err != nil {
+		t.Fatalf("PlainInit(seed) error = %v", err)
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("Worktree() error = %v", err)
+	}
+
+	writeAndCommit(t, wt, seedDir, "README.md", "base", "initial commit")
+
+	if err = wt.Checkout(
+		&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("feature"), Create: true},
+	); err != nil {
+		t.Fatalf("Checkout(feature) error = %v", err)
+	}
+	writeAndCommit(t, wt, seedDir, "feature.txt", "feature", "feature commit")
+
+	if err = wt.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("master")}); err != nil {
+		t.Fatalf("Checkout(master) error = %v", err)
+	}
+
+	_, err = repo.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{remoteDir}})
+	if err != nil {
+		t.Fatalf("CreateRemote() error = %v", err)
+	}
+
+	err = repo.Push(&git.PushOptions{RemoteName: "origin", RefSpecs: []config.RefSpec{
+		"refs/heads/master:refs/heads/master",
+		"refs/heads/feature:refs/heads/feature",
+	}})
+	if err != nil {
+		t.Fatalf("Push() error = %v", err)
+	}
+
+	return remoteDir
+}
+
+func writeAndCommit(t *testing.T, wt *git.Worktree, repoDir, fileName, contents, message string) {
+	t.Helper()
+
+	filePath := filepath.Join(repoDir, fileName)
+	if err := os.WriteFile(filePath, []byte(contents), 0600); err != nil {
+		t.Fatalf("WriteFile(%s) error = %v", fileName, err)
+	}
+
+	if _, err := wt.Add(fileName); err != nil {
+		t.Fatalf("Add(%s) error = %v", fileName, err)
+	}
+
+	if _, err := wt.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
+	}); err != nil {
+		t.Fatalf("Commit(%s) error = %v", message, err)
+	}
+}
+
+func currentHeadBranch(t *testing.T, repoDir string) string {
+	t.Helper()
+
+	repo, err := git.PlainOpen(repoDir)
+	if err != nil {
+		t.Fatalf("PlainOpen() error = %v", err)
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		t.Fatalf("Head() error = %v", err)
+	}
+
+	return head.Name().Short()
 }

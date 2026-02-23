@@ -10,14 +10,11 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-)
-
-var (
-	ErrValidationFailed = errors.New("validation failed")
 )
 
 type Service struct {
@@ -124,21 +121,36 @@ func (s *Service) Pull(ctx context.Context, req PullRequest) error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	pullOptions := &git.PullOptions{
-		Depth: 1,
+	head, err := repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get repository HEAD: %w", err)
 	}
 
-	if req.Branch != "" {
-		pullOptions.SingleBranch = true
-		pullOptions.ReferenceName = plumbing.NewBranchReferenceName(req.Branch)
-	}
+	pullReferenceName := head.Name()
 
 	auth, err := s.buildAuth(req.Auth)
 	if err != nil {
 		return err
 	}
 
-	pullOptions.Auth = auth
+	if req.Branch != "" {
+		targetReferenceName := plumbing.NewBranchReferenceName(req.Branch)
+		pullReferenceName = targetReferenceName
+
+		if head.Name() != targetReferenceName {
+			if err = s.checkoutBranch(ctx, repo, worktree, req.Branch, auth); err != nil {
+				return err
+			}
+		}
+	}
+
+	pullOptions := &git.PullOptions{
+		Depth:         1,
+		RemoteName:    "origin",
+		ReferenceName: pullReferenceName,
+		SingleBranch:  true,
+		Auth:          auth,
+	}
 
 	if pullErr := worktree.PullContext(
 		ctx,
@@ -146,6 +158,60 @@ func (s *Service) Pull(ctx context.Context, req PullRequest) error {
 	); pullErr != nil &&
 		!errors.Is(pullErr, git.NoErrAlreadyUpToDate) {
 		return fmt.Errorf("failed to pull repository: %w", pullErr)
+	}
+
+	return nil
+}
+
+func (s *Service) checkoutBranch(
+	ctx context.Context,
+	repo *git.Repository,
+	worktree *git.Worktree,
+	branch string,
+	auth transport.AuthMethod,
+) error {
+	targetReferenceName := plumbing.NewBranchReferenceName(branch)
+	if _, err := repo.Reference(targetReferenceName, true); err == nil {
+		if checkoutErr := worktree.Checkout(&git.CheckoutOptions{Branch: targetReferenceName}); checkoutErr != nil {
+			return fmt.Errorf("failed to checkout branch %q: %w", branch, checkoutErr)
+		}
+
+		return nil
+	} else if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+		return fmt.Errorf("failed to lookup branch %q: %w", branch, err)
+	}
+
+	remoteReferenceName := plumbing.NewRemoteReferenceName("origin", branch)
+	if fetchErr := repo.FetchContext(ctx, &git.FetchOptions{
+		RemoteName: "origin",
+		RefSpecs: []config.RefSpec{
+			config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch)),
+		},
+		Depth: 1,
+		Auth:  auth,
+	}); fetchErr != nil && !errors.Is(fetchErr, git.NoErrAlreadyUpToDate) {
+		if errors.Is(fetchErr, git.ErrRemoteRefNotFound) {
+			return fmt.Errorf("%w: %q", ErrBranchNotFound, branch)
+		}
+
+		return fmt.Errorf("failed to fetch branch %q: %w", branch, fetchErr)
+	}
+
+	remoteReference, err := repo.Reference(remoteReferenceName, true)
+	if err != nil {
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return fmt.Errorf("%w: %q", ErrBranchNotFound, branch)
+		}
+
+		return fmt.Errorf("failed to lookup remote branch %q: %w", branch, err)
+	}
+
+	if checkoutErr := worktree.Checkout(&git.CheckoutOptions{
+		Branch: targetReferenceName,
+		Hash:   remoteReference.Hash(),
+		Create: true,
+	}); checkoutErr != nil {
+		return fmt.Errorf("failed to checkout branch %q: %w", branch, checkoutErr)
 	}
 
 	return nil
