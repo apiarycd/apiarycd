@@ -74,7 +74,7 @@ func Default() Config {
 		},
 
 		Storage: storageConfig{
-			DataDir: "./data",
+			DataDir: "./data/db",
 		},
 
 		Docker: dockerConfig{
@@ -85,7 +85,7 @@ func Default() Config {
 
 		Repositories: repositoriesConfig{
 			Timeout:     30 * time.Second,
-			StorageDir:  "./repos",
+			StorageDir:  "./data/repos",
 			DefaultAuth: gitAuthConfig{},
 		},
 	}

@@ -11,8 +11,8 @@ import (
 )
 
 type GitAuth struct {
-	HTTPS GitHTTPSAuth
-	SSH   GitSSHAuth
+	HTTPS *GitHTTPSAuth
+	SSH   *GitSSHAuth
 }
 
 func (a GitAuth) BuildAuth() (transport.AuthMethod, bool, error) {
@@ -35,7 +35,11 @@ type GitHTTPSAuth struct {
 	Password string `json:"-"`
 }
 
-func (a GitHTTPSAuth) BuildAuth() (transport.AuthMethod, bool) {
+func (a *GitHTTPSAuth) BuildAuth() (transport.AuthMethod, bool) {
+	if a == nil {
+		return nil, false
+	}
+
 	if a.Username != "" && a.Password != "" {
 		return &http.BasicAuth{
 			Username: a.Username,
@@ -60,7 +64,11 @@ type GitSSHAuth struct {
 	Password       string `json:"-"`
 }
 
-func (c GitSSHAuth) Validate() error {
+func (c *GitSSHAuth) Validate() error {
+	if c == nil {
+		return nil
+	}
+
 	if c.PrivateKeyPath == "" {
 		return nil
 	}
@@ -72,7 +80,11 @@ func (c GitSSHAuth) Validate() error {
 	return nil
 }
 
-func (c GitSSHAuth) BuildAuth() (transport.AuthMethod, bool, error) {
+func (c *GitSSHAuth) BuildAuth() (transport.AuthMethod, bool, error) {
+	if c == nil {
+		return nil, false, nil
+	}
+
 	if c.PrivateKeyPath == "" {
 		return nil, false, nil
 	}
