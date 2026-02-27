@@ -65,6 +65,12 @@ func (s *Service) Clone(ctx context.Context, req CloneRequest) error {
 	defer cancel()
 
 	dir := s.buildPath(req.ID)
+	dirExisted := false
+	if _, statErr := os.Stat(dir); statErr == nil {
+		dirExisted = true
+	} else if !os.IsNotExist(statErr) {
+		return fmt.Errorf("failed to check repository directory: %w", statErr)
+	}
 
 	cloneOptions := &git.CloneOptions{
 		URL:   req.URL,
@@ -85,7 +91,9 @@ func (s *Service) Clone(ctx context.Context, req CloneRequest) error {
 
 	if _, cloneErr := git.PlainCloneContext(ctx, dir, cloneOptions); cloneErr != nil {
 		// Clean up partially cloned directory to avoid leaving corrupt state
-		_ = os.RemoveAll(dir)
+		if !dirExisted {
+			_ = os.RemoveAll(dir)
+		}
 		return fmt.Errorf("failed to clone repository: %w", cloneErr)
 	}
 
@@ -213,7 +221,7 @@ func normalizeRemoteURL(raw string) string {
 			host += ":" + port
 		}
 		path := strings.Trim(strings.TrimSuffix(parsed.Path, ".git"), "/")
-		return strings.ToLower(host + "/" + path)
+		return strings.ToLower(host) + "/" + path
 	}
 
 	if _, after, ok := strings.Cut(trimmed, "@"); ok {
@@ -222,9 +230,9 @@ func normalizeRemoteURL(raw string) string {
 		if parts := strings.SplitN(hostPath, ":", hostPortParts); len(parts) == hostPortParts {
 			host := strings.ToLower(parts[0])
 			path := strings.Trim(strings.TrimSuffix(parts[1], ".git"), "/")
-			return strings.ToLower(host + "/" + path)
+			return strings.ToLower(host) + "/" + path
 		}
 	}
 
-	return strings.ToLower(strings.Trim(strings.TrimSuffix(trimmed, ".git"), "/"))
+	return strings.Trim(strings.TrimSuffix(trimmed, ".git"), "/")
 }

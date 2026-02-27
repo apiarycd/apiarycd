@@ -121,11 +121,7 @@ func (s *Service) syncUpdatedStackRepository(ctx context.Context, current, next 
 
 	if current.GitAuth.Username != next.GitAuth.Username ||
 		current.GitAuth.Password != next.GitAuth.Password {
-		if err := s.repositoriesSvc.Pull(ctx, repositories.PullRequest{
-			ID:     req.ID,
-			Branch: req.Branch,
-			Auth:   req.Auth,
-		}); err != nil {
+		if err := s.repositoriesSvc.Pull(ctx, repositories.PullRequest(req)); err != nil {
 			return fmt.Errorf("failed to pull repository after git settings change: %w", err)
 		}
 	}
@@ -153,7 +149,7 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 
 	if err := s.repositoriesSvc.Delete(ctx, id); err != nil {
 		s.logger.Error("failed to delete stack repository", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to delete stack repository: %w", err)
 	}
 
 	err := s.stacks.Delete(ctx, id)
