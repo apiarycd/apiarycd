@@ -47,7 +47,7 @@ type gitSSHAuthConfig struct {
 
 type gitHTTPSAuthConfig struct {
 	Username string `koanf:"username"`
-	Password string `koanf:"password"`
+	Password string `koanf:"password"` //nolint:gosec // config value
 }
 
 type repositoriesConfig struct {

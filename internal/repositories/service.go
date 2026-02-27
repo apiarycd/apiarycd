@@ -57,6 +57,10 @@ func (s *Service) CloneOrPull(ctx context.Context, req CloneRequest) error {
 }
 
 func (s *Service) Clone(ctx context.Context, req CloneRequest) error {
+	if strings.TrimSpace(req.URL) == "" {
+		return fmt.Errorf("%w: missing URL", ErrValidationFailed)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, s.config.Timeout)
 	defer cancel()
 
@@ -209,7 +213,7 @@ func normalizeRemoteURL(raw string) string {
 			host += ":" + port
 		}
 		path := strings.Trim(strings.TrimSuffix(parsed.Path, ".git"), "/")
-		return strings.ToLower(host + ":" + port + "/" + path)
+		return strings.ToLower(host + "/" + path)
 	}
 
 	if _, after, ok := strings.Cut(trimmed, "@"); ok {

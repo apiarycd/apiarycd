@@ -32,7 +32,7 @@ func (a GitAuth) BuildAuth() (transport.AuthMethod, bool, error) {
 
 type GitHTTPSAuth struct {
 	Username string
-	Password string
+	Password string `json:"-"`
 }
 
 func (a GitHTTPSAuth) BuildAuth() (transport.AuthMethod, bool) {
@@ -57,7 +57,7 @@ func (a GitHTTPSAuth) BuildAuth() (transport.AuthMethod, bool) {
 type GitSSHAuth struct {
 	PrivateKeyPath string
 	Username       string
-	Password       string
+	Password       string `json:"-"`
 }
 
 func (c GitSSHAuth) Validate() error {

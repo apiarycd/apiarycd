@@ -8,7 +8,7 @@ import (
 
 type GitAuth struct {
 	Username string `json:"username"`
-	Password string `json:"password" format:"password"`
+	Password string `json:"password" format:"password"` //nolint:gosec // input from user
 }
 
 type Stack struct {
