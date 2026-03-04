@@ -8,7 +8,7 @@ import (
 
 type GitAuth struct {
 	Username string
-	Password string
+	Password string `json:"-"`
 }
 
 type StackDraft struct {
