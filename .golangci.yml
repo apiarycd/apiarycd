@@ -257,12 +257,14 @@ linters:
         - ^firebase.google.com/go/v4/messaging.Message$
         - ^github.com/aws/aws-sdk-go-v2/service/s3.+Input$
         - ^github.com/aws/aws-sdk-go-v2/service/s3/types.ObjectIdentifier$
+        - ^github.com/go-git/go-git/.+Options$
         - ^github.com/go-telegram-bot-api/telegram-bot-api/.+Config$
         - ^github.com/go-telegram/bot.+Params$
         - ^github.com/go-telegram/bot/models.+$
         - ^github.com/gofiber/.+Config$
         - ^github.com/golang-jwt/jwt/v5.+Claims$
         - ^github.com/mitchellh/mapstructure.DecoderConfig$
+        - ^github.com/moby/moby/client.+Options$
         - ^github.com/mymmrac/telego.+Parameters$
         - ^github.com/prometheus/client_golang/.+Opts$
         - ^github.com/secsy/goftp.Config$
@@ -283,7 +285,6 @@ linters:
         - ^gopkg.in/telebot.v4.Settings$
         - ^gopkg.in/yaml.v3.Node$
         - ^gorm.io/gorm/clause.+$
-        - ^github.com/moby/moby/client.+Options$
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true
