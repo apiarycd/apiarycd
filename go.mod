@@ -3,16 +3,15 @@ module github.com/apiarycd/apiarycd
 go 1.24.3
 
 require (
-	github.com/capcom6/go-infra-fx v0.5.3
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/go-core-fx/config v0.1.0
-	github.com/go-core-fx/fiberfx v0.3.1-0.20260109013855-57cd97e4ad05
+	github.com/go-core-fx/fiberfx v0.5.0
 	github.com/go-core-fx/healthfx v0.0.2-0.20260109013230-f7729a0a06bc
 	github.com/go-core-fx/logger v0.0.1
+	github.com/go-core-fx/validatorfx v0.0.2
 	github.com/go-git/go-git/v6 v6.0.0-20260114124804-a8db3a6585a6
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/gofiber/fiber/v2 v2.52.10
-	github.com/gofiber/swagger v1.1.1
 	github.com/google/uuid v1.6.0
 	github.com/moby/moby/api v1.52.0
 	github.com/moby/moby/client v0.2.1
@@ -61,6 +60,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofiber/contrib/fiberzap/v2 v2.1.6 // indirect
+	github.com/gofiber/swagger v1.1.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
