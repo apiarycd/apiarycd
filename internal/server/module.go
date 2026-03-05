@@ -3,10 +3,10 @@ package server
 import (
 	"github.com/apiarycd/apiarycd/internal/server/docs"
 	"github.com/apiarycd/apiarycd/internal/server/handlers/stacks"
-	"github.com/apiarycd/apiarycd/pkg/openapifx"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/handler"
 	"github.com/go-core-fx/fiberfx/health"
+	"github.com/go-core-fx/fiberfx/openapi"
 	"github.com/go-core-fx/fiberfx/validation"
 	"github.com/go-core-fx/logger"
 	"github.com/gofiber/fiber/v2"
@@ -28,13 +28,14 @@ func Module() fx.Option {
 		fx.Supply(docs.SwaggerInfo),
 
 		fx.Provide(
-			fx.Annotate(health.NewHandler, fx.ResultTags(`name:"health-handler"`)), fx.Private,
-			fx.Annotate(stacks.NewHandler, fx.ResultTags(`group:"handlers"`)), fx.Private,
+			health.NewHandler, openapi.NewHandler,
+			fx.Annotate(stacks.NewHandler, fx.ResultTags(`group:"handlers"`)),
+			fx.Private,
 		),
 
 		fx.Invoke(
 			fx.Annotate(
-				func(handlers []handler.Handler, healthHandler handler.Handler, openapiHandler *openapifx.Handler, app *fiber.App) {
+				func(handlers []handler.Handler, healthHandler *health.Handler, openapiHandler *openapi.Handler, app *fiber.App) {
 					// Health endpoint
 					healthHandler.Register(app)
 
@@ -48,7 +49,7 @@ func Module() fx.Option {
 						h.Register(v1)
 					}
 				},
-				fx.ParamTags(`group:"handlers"`, `name:"health-handler"`),
+				fx.ParamTags(`group:"handlers"`),
 			),
 		),
 	)

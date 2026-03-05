@@ -11,11 +11,10 @@ import (
 	"github.com/apiarycd/apiarycd/internal/swarm"
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
-	"github.com/apiarycd/apiarycd/pkg/openapifx"
-	"github.com/capcom6/go-infra-fx/validator"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/healthfx"
 	"github.com/go-core-fx/logger"
+	"github.com/go-core-fx/validatorfx"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -29,8 +28,7 @@ func Run(version healthfx.Version) {
 		dockerfx.Module(),
 		healthfx.Module(),
 		fiberfx.Module(),
-		openapifx.Module(),
-		validator.Module,
+		validatorfx.Module(),
 		//
 		// APP MODULES
 		config.Module(),

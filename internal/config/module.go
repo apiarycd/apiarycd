@@ -4,8 +4,8 @@ import (
 	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
-	"github.com/apiarycd/apiarycd/pkg/openapifx"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/fiberfx/openapi"
 	"go.uber.org/fx"
 )
 
@@ -38,8 +38,8 @@ func Module() fx.Option {
 				},
 			}
 		}),
-		fx.Provide(func(cfg Config) openapifx.Config {
-			return openapifx.Config{
+		fx.Provide(func(cfg Config) openapi.Config {
+			return openapi.Config{
 				Enabled:    cfg.HTTP.OpenAPI.Enabled,
 				PublicHost: cfg.HTTP.OpenAPI.PublicHost,
 				PublicPath: cfg.HTTP.OpenAPI.PublicPath,
