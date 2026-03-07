@@ -6,6 +6,7 @@ import (
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/openapi"
+	"github.com/samber/lo"
 	"go.uber.org/fx"
 )
 
@@ -54,7 +55,7 @@ func Module() fx.Option {
 					Auth: repositories.GitAuth{
 						SSH: &repositories.GitSSHAuth{
 							PrivateKeyPath: cfg.Repositories.DefaultAuth.SSH.PrivateKeyPath,
-							Username:       "git",
+							Username:       lo.CoalesceOrEmpty(cfg.Repositories.DefaultAuth.SSH.Username, "git"),
 							Password:       "",
 						},
 						HTTPS: &repositories.GitHTTPSAuth{
