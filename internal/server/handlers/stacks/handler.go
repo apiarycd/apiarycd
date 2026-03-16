@@ -220,6 +220,11 @@ func (h *Handler) delete(c *fiber.Ctx) error {
 		return err
 	}
 
+	err = h.deploymentsSvc.DeleteByStack(c.Context(), id)
+	if err != nil {
+		return fmt.Errorf("failed to delete deployments: %w", err)
+	}
+
 	err = h.stacksSvc.Delete(c.Context(), id)
 	if err != nil {
 		return fmt.Errorf("failed to delete stack: %w", err)

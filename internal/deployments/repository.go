@@ -245,28 +245,55 @@ func (r *Repository) write(txn *badger.Txn, deployment *deploymentModel) error {
 // Delete deletes a deployment.
 func (r *Repository) Delete(_ context.Context, id uuid.UUID) error {
 	err := r.db.Update(func(txn *badger.Txn) error {
-		// First, get the deployment to remove indexes
-		deployment, err := r.getByID(txn, id)
+		return r.delete(txn, id)
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete deployment: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) delete(txn *badger.Txn, id uuid.UUID) error {
+	// First, get the deployment to remove indexes
+	deployment, err := r.getByID(txn, id)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment before deletion: %w", err)
+	}
+
+	// Delete the deployment
+	key := r.getKey(id)
+	if delErr := txn.Delete(key); delErr != nil && !errors.Is(delErr, badger.ErrKeyNotFound) {
+		return fmt.Errorf("failed to delete deployment: %w", delErr)
+	}
+
+	// Remove indexes
+	if rmErr := r.removeIndexes(txn, deployment); rmErr != nil {
+		return fmt.Errorf("failed to remove deployment indexes: %w", rmErr)
+	}
+
+	return nil
+}
+
+func (r *Repository) DeleteByStack(_ context.Context, stackID uuid.UUID) error {
+	err := r.db.Update(func(txn *badger.Txn) error {
+		deployments, err := r.listByStack(txn, stackID)
 		if err != nil {
-			return fmt.Errorf("failed to get deployment before deletion: %w", err)
+			return fmt.Errorf("failed to list deployments: %w", err)
 		}
 
-		// Delete the deployment
-		key := r.getKey(id)
-		if delErr := txn.Delete(key); delErr != nil && !errors.Is(delErr, badger.ErrKeyNotFound) {
-			return fmt.Errorf("failed to delete deployment: %w", delErr)
-		}
-
-		// Remove indexes
-		if rmErr := r.removeIndexes(txn, deployment); rmErr != nil {
-			return fmt.Errorf("failed to remove deployment indexes: %w", rmErr)
+		for _, deployment := range deployments {
+			if delErr := r.delete(txn, deployment.ID); delErr != nil {
+				return fmt.Errorf("failed to delete deployment: %w", delErr)
+			}
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to delete deployment: %w", err)
+		return fmt.Errorf("failed to delete deployments: %w", err)
 	}
 
 	return nil
@@ -328,40 +355,48 @@ func (r *Repository) ListByStack(_ context.Context, stackID uuid.UUID) ([]Deploy
 	var deployments []Deployment
 
 	err := r.db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 10
-
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		prefix := r.getStackPrefix(stackID)
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			item := it.Item()
-
-			if err := item.Value(func(val []byte) error {
-				var deploymentID uuid.UUID
-				if err := json.Unmarshal(val, &deploymentID); err != nil {
-					return fmt.Errorf("failed to unmarshal deployment ID: %w", err)
-				}
-
-				deployment, err := r.getByID(txn, deploymentID)
-				if err != nil {
-					return err
-				}
-
-				deployments = append(deployments, *newDeployment(deployment))
-
-				return nil
-			}); err != nil {
-				return fmt.Errorf("failed to read stack deployment entry: %w", err)
-			}
-		}
-
-		return nil
+		var err error
+		deployments, err = r.listByStack(txn, stackID)
+		return err
 	})
 
 	if err != nil {
-		return deployments, fmt.Errorf("failed to list deployments: %w", err)
+		return nil, fmt.Errorf("failed to list deployments: %w", err)
+	}
+
+	return deployments, nil
+}
+
+func (r *Repository) listByStack(txn *badger.Txn, stackID uuid.UUID) ([]Deployment, error) {
+	var deployments []Deployment
+
+	opts := badger.DefaultIteratorOptions
+	opts.PrefetchSize = 10
+
+	it := txn.NewIterator(opts)
+	defer it.Close()
+
+	prefix := r.getStackPrefix(stackID)
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		item := it.Item()
+
+		if err := item.Value(func(val []byte) error {
+			var deploymentID uuid.UUID
+			if err := json.Unmarshal(val, &deploymentID); err != nil {
+				return fmt.Errorf("failed to unmarshal deployment ID: %w", err)
+			}
+
+			deployment, err := r.getByID(txn, deploymentID)
+			if err != nil {
+				return err
+			}
+
+			deployments = append(deployments, *newDeployment(deployment))
+
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("failed to read stack deployment entry: %w", err)
+		}
 	}
 
 	return deployments, nil

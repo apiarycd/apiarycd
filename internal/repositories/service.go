@@ -40,7 +40,7 @@ func NewService(config Config, logger *zap.Logger) (*Service, error) {
 }
 
 func (s *Service) CloneOrPull(ctx context.Context, req CloneRequest) error {
-	dir := s.buildPath(req.ID)
+	dir := s.BuildPath(req.ID)
 
 	_, err := os.Stat(dir)
 	switch {
@@ -61,7 +61,7 @@ func (s *Service) Clone(ctx context.Context, req CloneRequest) error {
 	ctx, cancel := context.WithTimeout(ctx, s.config.Timeout)
 	defer cancel()
 
-	dir := s.buildPath(req.ID)
+	dir := s.BuildPath(req.ID)
 
 	// Create a unique staging directory for atomic clone
 	stagingDir := dir + ".tmp-" + uuid.New().String()
@@ -119,7 +119,7 @@ func (s *Service) Pull(ctx context.Context, req PullRequest) error {
 		return fmt.Errorf("%w: missing URL", ErrValidationFailed)
 	}
 
-	dir := s.buildPath(req.ID)
+	dir := s.BuildPath(req.ID)
 
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
@@ -232,7 +232,7 @@ func (s *Service) checkoutBranch(
 }
 
 func (s *Service) Delete(_ context.Context, id uuid.UUID) error {
-	dir := s.buildPath(id)
+	dir := s.BuildPath(id)
 
 	if err := os.RemoveAll(dir); err != nil {
 		return fmt.Errorf("failed to remove repository: %w", err)
@@ -263,7 +263,7 @@ func (s *Service) buildAuth(auth GitAuth) (transport.AuthMethod, error) {
 	return am, nil
 }
 
-func (s *Service) buildPath(id uuid.UUID) string {
+func (s *Service) BuildPath(id uuid.UUID) string {
 	return filepath.Join(s.config.StorageDir, id.String())
 }
 
