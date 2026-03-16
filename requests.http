@@ -12,8 +12,8 @@ Content-Type: application/json
 
 {
     "name": "Test",
-    "git_url": "https://github.com/postmanlabs/httpbin",
-    "git_branch": "master",
+    "git_url": "https://github.com/MeneerHeijpaal/simple-nginx-docker-compose",
+    "git_branch": "main",
     "compose_path": "docker-compose.yml"
 }
 
@@ -26,8 +26,8 @@ PATCH {{apiURL}}/stacks/{{stackId}} HTTP/1.1
 Content-Type: application/json
 
 {
-    "git_url": "https://github.com/postmanlabs/httpbin",
-    "git_branch": "master",
+    "git_url": "https://github.com/MeneerHeijpaal/simple-nginx-docker-compose",
+    "git_branch": "main",
     "compose_path": "docker-compose.yml"
 }
 

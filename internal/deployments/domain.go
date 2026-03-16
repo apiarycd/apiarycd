@@ -38,13 +38,8 @@ type DeploymentDraft struct {
 	Variables map[string]string // Deployment-specific variables
 
 	// Status
-	Status      Status     // pending, running, success, failed, cancelled
-	StartedAt   *time.Time // When deployment started
-	CompletedAt *time.Time // When deployment completed/failed
-	Error       string     // Error message if failed
-
-	// Logs and Metrics
-	Logs []string // Deployment logs
+	Status    Status     // pending, running, success, failed, cancelled
+	StartedAt *time.Time // When deployment started
 
 	// Rollback Information
 	PreviousDeployment *uuid.UUID // Previous deployment ID for rollback
@@ -53,7 +48,14 @@ type DeploymentDraft struct {
 type Deployment struct {
 	DeploymentDraft
 
-	ID        uuid.UUID
+	ID uuid.UUID
+
+	CompletedAt *time.Time // When deployment completed/failed
+	Error       string     // Error message if failed
+
+	// Logs and Metrics
+	Logs []string // Deployment logs
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -66,4 +68,10 @@ func (d *Deployment) MarkDeployedAt(deployedAt time.Time) {
 func (d *Deployment) MarkRolledBack(rolledBackAt time.Time) {
 	d.Status = StatusRolledBack
 	d.CompletedAt = &rolledBackAt
+}
+
+func (d *Deployment) MarkFailed(failedAt time.Time, errMsg string) {
+	d.Status = StatusFailed
+	d.CompletedAt = &failedAt
+	d.Error = errMsg
 }

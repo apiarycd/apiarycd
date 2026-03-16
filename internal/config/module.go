@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/apiarycd/apiarycd/internal/deployments"
 	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/apiarycd/apiarycd/pkg/badgerfx"
 	"github.com/apiarycd/apiarycd/pkg/dockerfx"
@@ -63,6 +64,11 @@ func Module() fx.Option {
 							Password: cfg.Repositories.DefaultAuth.HTTPS.Password,
 						},
 					},
+				}
+			},
+			func(cfg Config) deployments.Config {
+				return deployments.Config{
+					DeployTimeout: cfg.Deployments.DeployTimeout,
 				}
 			},
 		),

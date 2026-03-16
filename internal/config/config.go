@@ -57,12 +57,17 @@ type repositoriesConfig struct {
 	DefaultAuth gitAuthConfig `koanf:"default_auth"`
 }
 
+type deploymentsConfig struct {
+	DeployTimeout time.Duration `koanf:"deploy_timeout"`
+}
+
 type Config struct {
 	HTTP http `koanf:"http"`
 
 	Storage      storageConfig      `koanf:"storage"`
 	Docker       dockerConfig       `koanf:"docker"`
 	Repositories repositoriesConfig `koanf:"repositories"`
+	Deployments  deploymentsConfig  `koanf:"deployments"`
 }
 
 func Default() Config {
@@ -88,6 +93,10 @@ func Default() Config {
 			Timeout:     30 * time.Second,
 			StorageDir:  "./data/repos",
 			DefaultAuth: gitAuthConfig{},
+		},
+
+		Deployments: deploymentsConfig{
+			DeployTimeout: 5 * time.Minute,
 		},
 	}
 }

@@ -54,9 +54,9 @@ func newDeploymentModel(draft *DeploymentDraft) *deploymentModel {
 		Variables:          draft.Variables,
 		Status:             draft.Status,
 		StartedAt:          draft.StartedAt,
-		CompletedAt:        draft.CompletedAt,
-		Error:              draft.Error,
-		Logs:               draft.Logs,
+		CompletedAt:        nil,
+		Error:              "",
+		Logs:               nil,
 		PreviousDeployment: draft.PreviousDeployment,
 	}
 }
@@ -77,20 +77,21 @@ func newDeployment(model *deploymentModel) *Deployment {
 
 	return &Deployment{
 		DeploymentDraft: DeploymentDraft{
-			StackID:            model.StackID,
-			Version:            model.Version,
-			GitRef:             model.GitRef,
-			Message:            model.Message,
-			Variables:          model.Variables,
-			Status:             model.Status,
-			StartedAt:          model.StartedAt,
-			CompletedAt:        model.CompletedAt,
-			Error:              model.Error,
-			Logs:               model.Logs,
+			StackID:   model.StackID,
+			Version:   model.Version,
+			GitRef:    model.GitRef,
+			Message:   model.Message,
+			Variables: model.Variables,
+			Status:    model.Status,
+			StartedAt: model.StartedAt,
+
 			PreviousDeployment: model.PreviousDeployment,
 		},
-		ID:        model.ID,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:          model.ID,
+		CompletedAt: model.CompletedAt,
+		Error:       model.Error,
+		Logs:        model.Logs,
+		CreatedAt:   model.CreatedAt,
+		UpdatedAt:   model.UpdatedAt,
 	}
 }

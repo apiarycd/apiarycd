@@ -141,6 +141,19 @@ func cloneRequestFromStack(stack Stack) repositories.CloneRequest {
 	}
 }
 
+func (s *Service) SyncRepository(ctx context.Context, id uuid.UUID) (string, error) {
+	stack, err := s.stacks.GetByID(ctx, id)
+	if err != nil {
+		return "", fmt.Errorf("failed to get stack before repository sync: %w", err)
+	}
+
+	if cloneErr := s.repositoriesSvc.CloneOrPull(ctx, cloneRequestFromStack(*stack)); cloneErr != nil {
+		return "", fmt.Errorf("failed to synchronize stack repository: %w", cloneErr)
+	}
+
+	return s.repositoriesSvc.BuildPath(id), nil
+}
+
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	s.logger.Info("deleting stack", zap.String("id", id.String()))
 
