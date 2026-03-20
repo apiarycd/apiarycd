@@ -220,11 +220,6 @@ func (h *Handler) delete(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = h.deploymentsSvc.DeleteByStack(c.Context(), id)
-	if err != nil {
-		return fmt.Errorf("failed to delete deployments: %w", err)
-	}
-
 	err = h.stacksSvc.Delete(c.Context(), id)
 	if err != nil {
 		return fmt.Errorf("failed to delete stack: %w", err)
@@ -254,13 +249,7 @@ func (h *Handler) deploy(c *fiber.Ctx, req *POSTDeployRequest) error {
 		return err
 	}
 
-	d, err := h.deploymentsSvc.Trigger(
-		c.Context(),
-		deployments.DeploymentRequest{
-			StackID:   id,
-			Variables: req.Variables,
-		},
-	)
+	d, err := h.stacksSvc.Deploy(c.Context(), id, req.Variables)
 	if err != nil {
 		return fmt.Errorf("failed to trigger deployment: %w", err)
 	}

@@ -134,3 +134,11 @@ func expandHome(path string) (string, error) {
 	}
 	return path, nil
 }
+
+type Details struct {
+	Path          string
+	Branch        string
+	Tag           string
+	Commit        string
+	CommitMessage string
+}

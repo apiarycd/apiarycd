@@ -3,7 +3,9 @@ package stacks
 import (
 	"context"
 	"fmt"
+	"maps"
 
+	"github.com/apiarycd/apiarycd/internal/deployments"
 	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -12,14 +14,21 @@ import (
 type Service struct {
 	stacks *Repository
 
+	deploymentsSvc  *deployments.Service
 	repositoriesSvc *repositories.Service
 
 	logger *zap.Logger
 }
 
-func NewService(stacks *Repository, repositoriesSvc *repositories.Service, logger *zap.Logger) *Service {
+func NewService(
+	stacks *Repository,
+	deploymentsSvc *deployments.Service,
+	repositoriesSvc *repositories.Service,
+	logger *zap.Logger,
+) *Service {
 	return &Service{
 		stacks:          stacks,
+		deploymentsSvc:  deploymentsSvc,
 		repositoriesSvc: repositoriesSvc,
 		logger:          logger,
 	}
@@ -100,6 +109,84 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, updater func(*Stack)
 	return nil
 }
 
+func (s *Service) SyncRepository(ctx context.Context, id uuid.UUID) (*Stack, error) {
+	stack, err := s.stacks.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stack before repository sync: %w", err)
+	}
+
+	if cloneErr := s.repositoriesSvc.CloneOrPull(ctx, cloneRequestFromStack(*stack)); cloneErr != nil {
+		return nil, fmt.Errorf("failed to synchronize stack repository: %w", cloneErr)
+	}
+
+	return stack, nil
+}
+
+func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	s.logger.Info("deleting stack", zap.String("id", id.String()))
+
+	stack, err := s.stacks.GetByID(ctx, id)
+	if err != nil {
+		s.logger.Error("failed to delete stack", zap.Error(err))
+		return fmt.Errorf("failed to get stack for deletion: %w", err)
+	}
+
+	// Acquire per-stack lock to serialize deployments for the same stack.
+	// This prevents concurrent git worktree corruption and overlapping deploys.
+	s.deploymentsSvc.LockStack(id)
+	defer s.deploymentsSvc.UnlockStack(id)
+
+	if delErr := s.deploymentsSvc.DeleteByStack(ctx, stack.ID, stack.Name); delErr != nil {
+		s.logger.Error("failed to delete stack deployments", zap.Error(delErr))
+		return fmt.Errorf("failed to delete stack deployments: %w", delErr)
+	}
+
+	if delErr := s.stacks.Delete(ctx, id); delErr != nil {
+		s.logger.Error("failed to delete stack", zap.Error(delErr))
+		return fmt.Errorf("failed to delete stack: %w", delErr)
+	}
+
+	if delErr := s.repositoriesSvc.Delete(ctx, id); delErr != nil {
+		s.logger.Error("failed to delete stack repository", zap.Error(delErr))
+		return fmt.Errorf("failed to delete stack repository: %w", delErr)
+	}
+
+	s.logger.Info("stack deleted", zap.String("id", id.String()))
+	return nil
+}
+
+func (s *Service) Deploy(
+	ctx context.Context,
+	id uuid.UUID,
+	variables map[string]string,
+) (*deployments.Deployment, error) {
+	// Acquire per-stack lock to serialize deployments for the same stack.
+	// This prevents concurrent git worktree corruption and overlapping deploys.
+	s.deploymentsSvc.LockStack(id)
+	defer s.deploymentsSvc.UnlockStack(id)
+
+	stack, err := s.SyncRepository(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sync repository before deployment: %w", err)
+	}
+
+	vars := make(map[string]string, len(stack.Variables)+len(variables))
+	maps.Copy(vars, stack.Variables)
+	maps.Copy(vars, variables)
+
+	deployment, err := s.deploymentsSvc.Trigger(ctx, deployments.DeploymentRequest{
+		StackID:     stack.ID,
+		StackName:   stack.Name,
+		ComposePath: stack.ComposePath,
+		Variables:   vars,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to trigger deployment: %w", err)
+	}
+
+	return deployment, nil
+}
+
 func (s *Service) syncUpdatedStackRepository(ctx context.Context, current, next *Stack) error {
 	req := cloneRequestFromStack(*next)
 
@@ -139,34 +226,4 @@ func cloneRequestFromStack(stack Stack) repositories.CloneRequest {
 			SSH:   nil,
 		},
 	}
-}
-
-func (s *Service) SyncRepository(ctx context.Context, id uuid.UUID) (string, error) {
-	stack, err := s.stacks.GetByID(ctx, id)
-	if err != nil {
-		return "", fmt.Errorf("failed to get stack before repository sync: %w", err)
-	}
-
-	if cloneErr := s.repositoriesSvc.CloneOrPull(ctx, cloneRequestFromStack(*stack)); cloneErr != nil {
-		return "", fmt.Errorf("failed to synchronize stack repository: %w", cloneErr)
-	}
-
-	return s.repositoriesSvc.BuildPath(id), nil
-}
-
-func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
-	s.logger.Info("deleting stack", zap.String("id", id.String()))
-
-	if err := s.stacks.Delete(ctx, id); err != nil {
-		s.logger.Error("failed to delete stack", zap.Error(err))
-		return err
-	}
-
-	if err := s.repositoriesSvc.Delete(ctx, id); err != nil {
-		s.logger.Error("failed to delete stack repository", zap.Error(err))
-		return fmt.Errorf("failed to delete stack repository: %w", err)
-	}
-
-	s.logger.Info("stack deleted", zap.String("id", id.String()))
-	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,8 +13,9 @@ import (
 	"time"
 
 	"github.com/apiarycd/apiarycd/internal/repositories"
-	"github.com/apiarycd/apiarycd/internal/stacks"
+	"github.com/apiarycd/apiarycd/internal/swarm"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
 
@@ -24,8 +24,8 @@ type Service struct {
 
 	deployments *Repository
 
-	stacksSvc       *stacks.Service
 	repositoriesSvc *repositories.Service
+	swarmSvc        *swarm.Swarm
 
 	logger *zap.Logger
 
@@ -38,8 +38,8 @@ type Service struct {
 func NewService(
 	config Config,
 	deployments *Repository,
-	stacksSvc *stacks.Service,
 	repositoriesSvc *repositories.Service,
+	swarmSvc *swarm.Swarm,
 	logger *zap.Logger,
 ) *Service {
 	return &Service{
@@ -47,8 +47,8 @@ func NewService(
 
 		deployments: deployments,
 
-		stacksSvc:       stacksSvc,
 		repositoriesSvc: repositoriesSvc,
+		swarmSvc:        swarmSvc,
 
 		logger: logger,
 
@@ -60,11 +60,6 @@ func NewService(
 // create creates a new deployment.
 func (s *Service) create(ctx context.Context, draft DeploymentDraft) (*Deployment, error) {
 	s.logger.Info("creating deployment", zap.String("stack_id", draft.StackID.String()))
-
-	if _, err := s.stacksSvc.Get(ctx, draft.StackID); err != nil {
-		s.logger.Error("failed to get stack", zap.Error(err))
-		return nil, fmt.Errorf("failed to get stack: %w", err)
-	}
 
 	deployment, err := s.deployments.Create(ctx, &draft)
 	if err != nil {
@@ -122,9 +117,9 @@ func (s *Service) update(ctx context.Context, id uuid.UUID, updater func(*Deploy
 	return nil
 }
 
-// acquireStackLock returns the mutex for a given stack ID, creating it if necessary.
-// The caller must call Unlock() on the returned mutex when done.
-func (s *Service) acquireStackLock(stackID uuid.UUID) *sync.Mutex {
+// LockStack locks the mutex for the given stack ID, creating it if necessary.
+// The caller must call UnlockStack when done.
+func (s *Service) LockStack(stackID uuid.UUID) {
 	s.stackMu.Lock()
 	mu, ok := s.stackLocks[stackID]
 	if !ok {
@@ -134,7 +129,20 @@ func (s *Service) acquireStackLock(stackID uuid.UUID) *sync.Mutex {
 	s.stackMu.Unlock()
 
 	mu.Lock()
-	return mu
+}
+
+// UnlockStack unlocks the mutex for the given stack ID.
+// It must be called only after LockStack for the same stackID.
+func (s *Service) UnlockStack(stackID uuid.UUID) {
+	s.stackMu.Lock()
+	mu := s.stackLocks[stackID]
+	s.stackMu.Unlock()
+
+	if mu == nil {
+		return
+	}
+
+	mu.Unlock()
 }
 
 // Trigger triggers a deployment.
@@ -143,21 +151,9 @@ func (s *Service) Trigger(ctx context.Context, req DeploymentRequest) (*Deployme
 
 	logger.Info("triggering deployment")
 
-	// Acquire per-stack lock to serialize deployments for the same stack.
-	// This prevents concurrent git worktree corruption and overlapping deploys.
-	stackLock := s.acquireStackLock(req.StackID)
-	defer stackLock.Unlock()
-
-	// Get the stack
-	stack, err := s.stacksSvc.Get(ctx, req.StackID)
-	if err != nil {
-		logger.Error("failed to get stack for trigger", zap.Error(err))
-		return nil, fmt.Errorf("failed to get stack for trigger: %w", err)
-	}
-
 	latest, err := s.deployments.GetLatestByStack(
 		ctx,
-		stack.ID,
+		req.StackID,
 		func(d *Deployment) bool { return d.Status == StatusSuccess },
 	)
 	if err != nil && !errors.Is(err, ErrNotFound) {
@@ -170,26 +166,23 @@ func (s *Service) Trigger(ctx context.Context, req DeploymentRequest) (*Deployme
 		previousDeploymentID = &latest.ID
 	}
 
-	variables := maps.Clone(stack.Variables)
-	if variables == nil {
-		variables = make(map[string]string, len(req.Variables))
-	}
-	maps.Copy(variables, req.Variables)
+	variables := maps.Clone(req.Variables)
 
-	var repositoryPath string
-	// Ensure local repository is up to date before deploying.
-	if repositoryPath, err = s.stacksSvc.SyncRepository(ctx, stack.ID); err != nil {
-		logger.Error("failed to synchronize stack repository", zap.Error(err))
-		return nil, fmt.Errorf("failed to synchronize stack repository: %w", err)
+	details, err := s.repositoriesSvc.GetDetails(ctx, req.StackID)
+	if err != nil {
+		logger.Error("failed to get repository details", zap.Error(err))
+		return nil, fmt.Errorf("failed to get repository details: %w", err)
 	}
+
+	repositoryPath := details.Path
 
 	// Update status to running and set started time
 	now := time.Now()
 	d, err := s.create(ctx, DeploymentDraft{
-		StackID:            stack.ID,
-		Version:            "latest",
-		GitRef:             stack.GitBranch,
-		Message:            "stack deploy",
+		StackID:            req.StackID,
+		Version:            details.Commit,
+		GitRef:             lo.CoalesceOrEmpty(details.Tag, details.Branch, details.Commit),
+		Message:            details.CommitMessage,
 		Variables:          variables,
 		Status:             StatusRunning,
 		StartedAt:          &now,
@@ -202,7 +195,7 @@ func (s *Service) Trigger(ctx context.Context, req DeploymentRequest) (*Deployme
 
 	logger = logger.With(zap.String("deployment_id", d.ID.String()))
 
-	logs, deployErr := s.deploy(ctx, repositoryPath, *stack, variables)
+	logs, deployErr := s.deploy(ctx, repositoryPath, req, variables)
 
 	now = time.Now()
 	if deployErr != nil {
@@ -288,64 +281,66 @@ func (s *Service) Rollback(ctx context.Context, stackID uuid.UUID) (*Deployment,
 	return latest, previous, nil
 }
 
-func (s *Service) DeleteByStack(ctx context.Context, stackID uuid.UUID) error {
-	// Acquire lock to wait for any in-flight deployment to complete
-	stackLock := s.acquireStackLock(stackID)
-	defer stackLock.Unlock()
+func (s *Service) DeleteByStack(ctx context.Context, stackID uuid.UUID, stackName string) error {
+	ctx, cancel := context.WithTimeout(ctx, s.config.DeployTimeout)
+	defer cancel()
 
-	// Clean up the lock entry
-	s.stackMu.Lock()
-	delete(s.stackLocks, stackID)
-	s.stackMu.Unlock()
+	if err := s.swarmSvc.RemoveStack(ctx, stackName); err != nil {
+		return fmt.Errorf("failed to remove docker stack: %w", err)
+	}
 
-	return s.deployments.DeleteByStack(ctx, stackID)
+	if err := s.deployments.DeleteByStack(ctx, stackID); err != nil {
+		return fmt.Errorf("failed to delete deployments by stack: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) deploy(
 	ctx context.Context,
 	repositoryPath string,
-	stack stacks.Stack,
+	req DeploymentRequest,
 	variables map[string]string,
 ) ([]string, error) {
 	// Apply deployment timeout
 	ctx, cancel := context.WithTimeout(ctx, s.config.DeployTimeout)
 	defer cancel()
 
-	cleanComposePath := filepath.Clean(stack.ComposePath)
+	composePath := strings.TrimSpace(req.ComposePath)
+	if composePath == "" {
+		return nil, fmt.Errorf("%w: compose path is required", ErrValidationFailed)
+	}
+
+	cleanComposePath := filepath.Clean(composePath)
 	if filepath.IsAbs(cleanComposePath) {
 		return nil, fmt.Errorf("%w: compose path must be relative to repository root", ErrNotAllowed)
 	}
 
-	composePath := filepath.Join(repositoryPath, cleanComposePath)
-	rel, relErr := filepath.Rel(repositoryPath, composePath)
+	composePath = filepath.Join(repositoryPath, cleanComposePath)
+	resolvedComposePath, err := filepath.EvalSymlinks(composePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve compose path: %w", err)
+	}
+	rel, relErr := filepath.Rel(repositoryPath, resolvedComposePath)
 	if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return nil, fmt.Errorf("%w: compose path escapes repository root", ErrNotAllowed)
 	}
 
-	if _, err := os.Stat(composePath); err != nil {
+	info, err := os.Stat(composePath)
+	if err != nil {
 		return nil, fmt.Errorf("compose file does not exist: %w", err)
 	}
-
-	// Use minimal base environment to avoid leaking sensitive host variables
-	env := []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + os.Getenv("HOME"),
+	if info.IsDir() {
+		return nil, fmt.Errorf("%w: compose path must point to a file", ErrValidationFailed)
 	}
-	// Include DOCKER_* variables for Docker client configuration
-	for _, e := range os.Environ() {
-		if strings.HasPrefix(e, "DOCKER_") {
-			env = append(env, e)
-		}
-	}
-	env = append(env, flattenEnv(variables)...)
-	args := []string{"stack", "deploy", "--compose-file", cleanComposePath, "--with-registry-auth", stack.Name}
 
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	cmd.Dir = repositoryPath
-	cmd.Env = env
-
-	output, err := cmd.CombinedOutput()
-	logs := splitLines(output)
+	env := flattenEnv(variables)
+	logs, err := s.swarmSvc.DeployStack(ctx, swarm.DeployStackRequest{
+		StackName:   req.StackName,
+		ComposePath: cleanComposePath,
+		WorkDir:     repositoryPath,
+		Env:         env,
+	})
 	if err != nil {
 		return logs, fmt.Errorf("failed to deploy stack: %w", err)
 	}
@@ -370,18 +365,4 @@ func flattenEnv(vars map[string]string) []string {
 	}
 
 	return env
-}
-
-func splitLines(output []byte) []string {
-	trimmed := strings.TrimSpace(string(output))
-	if trimmed == "" {
-		return nil
-	}
-
-	lines := strings.Split(trimmed, "\n")
-	for i := range lines {
-		lines[i] = strings.TrimRight(lines[i], "\r")
-	}
-
-	return lines
 }
