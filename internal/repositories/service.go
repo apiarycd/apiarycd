@@ -177,6 +177,78 @@ func (s *Service) Pull(ctx context.Context, req PullRequest) error {
 	return nil
 }
 
+func (s *Service) GetDetails(_ context.Context, id uuid.UUID) (*Details, error) {
+	dir := s.BuildPath(id)
+
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	commit, err := repo.CommitObject(head.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit object: %w", err)
+	}
+
+	details := &Details{
+		Path:          dir,
+		Branch:        "",
+		Tag:           "",
+		Commit:        head.Hash().String(),
+		CommitMessage: commit.Message,
+	}
+
+	if head.Name().IsBranch() {
+		details.Branch = head.Name().Short()
+	}
+	if head.Name().IsTag() {
+		details.Tag = head.Name().Short()
+	}
+
+	return details, nil
+}
+
+func (s *Service) Delete(_ context.Context, id uuid.UUID) error {
+	dir := s.BuildPath(id)
+
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("failed to remove repository: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) buildAuth(auth GitAuth) (transport.AuthMethod, error) {
+	am, ok, err := auth.BuildAuth()
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		return am, nil
+	}
+
+	am, ok, err = s.config.Auth.BuildAuth()
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		s.logger.Warn("no authentication configured for repository operation")
+	}
+
+	return am, nil
+}
+
+func (s *Service) BuildPath(id uuid.UUID) string {
+	return filepath.Join(s.config.StorageDir, id.String())
+}
+
 func (s *Service) checkoutBranch(
 	ctx context.Context,
 	repo *git.Repository,
@@ -229,42 +301,6 @@ func (s *Service) checkoutBranch(
 	}
 
 	return nil
-}
-
-func (s *Service) Delete(_ context.Context, id uuid.UUID) error {
-	dir := s.BuildPath(id)
-
-	if err := os.RemoveAll(dir); err != nil {
-		return fmt.Errorf("failed to remove repository: %w", err)
-	}
-
-	return nil
-}
-
-func (s *Service) buildAuth(auth GitAuth) (transport.AuthMethod, error) {
-	am, ok, err := auth.BuildAuth()
-	if err != nil {
-		return nil, err
-	}
-
-	if ok {
-		return am, nil
-	}
-
-	am, ok, err = s.config.Auth.BuildAuth()
-	if err != nil {
-		return nil, err
-	}
-
-	if !ok {
-		s.logger.Warn("no authentication configured for repository operation")
-	}
-
-	return am, nil
-}
-
-func (s *Service) BuildPath(id uuid.UUID) string {
-	return filepath.Join(s.config.StorageDir, id.String())
 }
 
 func validateRepositoryRemote(repo *git.Repository, expectedURL string) error {

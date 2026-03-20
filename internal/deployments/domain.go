@@ -19,7 +19,11 @@ const (
 
 type DeploymentRequest struct {
 	// References
-	StackID uuid.UUID
+	StackID   uuid.UUID
+	StackName string
+
+	// Path to compose file
+	ComposePath string
 
 	// Deployment Configuration
 	Variables map[string]string // Deployment-specific variables

@@ -3,8 +3,10 @@ package swarm
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
-	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"go.uber.org/zap"
 )
@@ -23,116 +25,102 @@ func NewSwarm(client *client.Client, logger *zap.Logger) *Swarm {
 	}
 }
 
-// InspectSwarm inspects the current Swarm state.
-func (s *Swarm) InspectSwarm(ctx context.Context) (swarm.Swarm, error) {
-	s.logger.Debug("Inspecting Swarm")
-
-	result, err := s.client.SwarmInspect(ctx, client.SwarmInspectOptions{})
-	if err != nil {
-		s.logger.Error("Failed to inspect Swarm", zap.Error(err))
-		return swarm.Swarm{}, fmt.Errorf("failed to inspect Swarm: %w", err)
-	}
-
-	s.logger.Debug("Swarm inspection successful", zap.String("id", result.Swarm.ID))
-	return result.Swarm, nil
-}
-
-// InitSwarm initializes a new Swarm.
-func (s *Swarm) InitSwarm(ctx context.Context, req client.SwarmInitOptions) (string, error) {
-	s.logger.Info("Initializing Swarm",
-		zap.String("listenAddr", req.ListenAddr),
-		zap.Bool("forceNewCluster", req.ForceNewCluster),
+// DeployStack deploys a Docker stack using a compose file.
+func (s *Swarm) DeployStack(ctx context.Context, req DeployStackRequest) ([]string, error) {
+	s.logger.Info(
+		"Deploying Docker stack",
+		zap.String("name", req.StackName),
+		zap.String("compose_path", req.ComposePath),
 	)
 
-	result, err := s.client.SwarmInit(ctx, req)
+	//nolint:gosec // skip for now
+	cmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"stack",
+		"deploy",
+		"--compose-file",
+		req.ComposePath,
+		"--with-registry-auth",
+		req.StackName,
+	)
+	cmd.Dir = req.WorkDir
+	cmd.Env = prepareEnv(req.Env)
+
+	output, err := cmd.CombinedOutput()
+	logs := splitLines(output)
 	if err != nil {
-		s.logger.Error("Failed to initialize Swarm", zap.Error(err))
-		return "", fmt.Errorf("failed to initialize Swarm: %w", err)
+		s.logger.Error(
+			"Failed to deploy Docker stack",
+			zap.String("name", req.StackName),
+			zap.String("output", strings.TrimSpace(string(output))),
+			zap.Error(err),
+		)
+		return logs, fmt.Errorf("failed to deploy stack %q: %w", req.StackName, err)
 	}
 
-	s.logger.Info("Swarm initialized successfully", zap.String("nodeID", result.NodeID))
-	return result.NodeID, nil
+	s.logger.Info("Docker stack deployed successfully", zap.String("name", req.StackName))
+	return logs, nil
 }
 
-// JoinSwarm joins an existing Swarm.
-func (s *Swarm) JoinSwarm(ctx context.Context, req client.SwarmJoinOptions) error {
-	s.logger.Info("Joining Swarm",
-		zap.Strings("remoteAddrs", req.RemoteAddrs),
-		zap.String("listenAddr", req.ListenAddr),
-	)
+// RemoveStack removes a deployed Docker stack by name.
+func (s *Swarm) RemoveStack(ctx context.Context, stackName string) error {
+	s.logger.Info("Removing Docker stack", zap.String("name", stackName))
 
-	_, err := s.client.SwarmJoin(ctx, req)
+	cmd := exec.CommandContext(ctx, "docker", "stack", "rm", stackName)
+	cmd.Env = prepareEnv(nil)
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.logger.Error("Failed to join Swarm", zap.Error(err))
-		return fmt.Errorf("failed to join Swarm: %w", err)
+		s.logger.Error(
+			"Failed to remove Docker stack",
+			zap.String("name", stackName),
+			zap.String("output", strings.TrimSpace(string(output))),
+			zap.Error(err),
+		)
+		return fmt.Errorf("failed to remove stack %q: %w", stackName, err)
 	}
 
-	s.logger.Info("Successfully joined Swarm")
+	s.logger.Info("Docker stack removed successfully", zap.String("name", stackName))
 	return nil
 }
 
-// LeaveSwarm leaves the current Swarm.
-func (s *Swarm) LeaveSwarm(ctx context.Context, force bool) error {
-	s.logger.Info("Leaving Swarm", zap.Bool("force", force))
-
-	_, err := s.client.SwarmLeave(ctx, client.SwarmLeaveOptions{
-		Force: force,
-	})
-	if err != nil {
-		s.logger.Error("Failed to leave Swarm", zap.Error(err))
-		return fmt.Errorf("failed to leave Swarm: %w", err)
+func prepareEnv(src []string) []string {
+	// Use minimal base environment to avoid leaking sensitive host variables
+	env := []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + os.Getenv("HOME"),
+	}
+	// Include DOCKER_* variables for Docker client configuration
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "DOCKER_") {
+			env = append(env, e)
+		}
 	}
 
-	s.logger.Info("Successfully left Swarm")
-	return nil
+	if len(src) > 0 {
+		for _, e := range src {
+			key, _, _ := strings.Cut(e, "=")
+			if key == "PATH" || key == "HOME" || strings.HasPrefix(key, "DOCKER_") {
+				continue
+			}
+			env = append(env, e)
+		}
+	}
+
+	return env
 }
 
-// ListServices lists all services in the Swarm.
-func (s *Swarm) ListServices(ctx context.Context) ([]swarm.Service, error) {
-	s.logger.Debug("Listing Swarm services")
-
-	result, err := s.client.ServiceList(ctx, client.ServiceListOptions{})
-	if err != nil {
-		s.logger.Error("Failed to list services", zap.Error(err))
-		return nil, fmt.Errorf("failed to list services: %w", err)
+func splitLines(output []byte) []string {
+	trimmed := strings.TrimSpace(string(output))
+	if trimmed == "" {
+		return nil
 	}
 
-	s.logger.Debug("Services listed successfully", zap.Int("count", len(result.Items)))
-	return result.Items, nil
-}
-
-// CreateService creates a new service in the Swarm.
-func (s *Swarm) CreateService(ctx context.Context, service swarm.ServiceSpec) (string, error) {
-	s.logger.Info("Creating service",
-		zap.String("name", service.Name),
-		zap.String("image", service.TaskTemplate.ContainerSpec.Image),
-	)
-
-	result, err := s.client.ServiceCreate(ctx, client.ServiceCreateOptions{
-		Spec: service,
-	})
-	if err != nil {
-		s.logger.Error("Failed to create service", zap.Error(err), zap.String("name", service.Name))
-		return "", fmt.Errorf("failed to create service: %w", err)
+	lines := strings.Split(trimmed, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], "\r")
 	}
 
-	s.logger.Info("Service created successfully",
-		zap.String("id", result.ID),
-		zap.String("name", service.Name),
-	)
-	return result.ID, nil
-}
-
-// RemoveService removes a service from the Swarm.
-func (s *Swarm) RemoveService(ctx context.Context, serviceID string) error {
-	s.logger.Info("Removing service", zap.String("id", serviceID))
-
-	_, err := s.client.ServiceRemove(ctx, serviceID, client.ServiceRemoveOptions{})
-	if err != nil {
-		s.logger.Error("Failed to remove service", zap.Error(err), zap.String("id", serviceID))
-		return fmt.Errorf("failed to remove service: %w", err)
-	}
-
-	s.logger.Info("Service removed successfully", zap.String("id", serviceID))
-	return nil
+	return lines
 }
