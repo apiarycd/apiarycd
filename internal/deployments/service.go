@@ -14,6 +14,7 @@ import (
 
 	"github.com/apiarycd/apiarycd/internal/repositories"
 	"github.com/apiarycd/apiarycd/internal/swarm"
+	"github.com/apiarycd/apiarycd/internal/swarm/immutables"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
@@ -26,6 +27,7 @@ type Service struct {
 
 	repositoriesSvc *repositories.Service
 	swarmSvc        *swarm.Swarm
+	renderer        *immutables.Renderer
 
 	logger *zap.Logger
 
@@ -40,6 +42,7 @@ func NewService(
 	deployments *Repository,
 	repositoriesSvc *repositories.Service,
 	swarmSvc *swarm.Swarm,
+	renderer *immutables.Renderer,
 	logger *zap.Logger,
 ) *Service {
 	return &Service{
@@ -49,6 +52,7 @@ func NewService(
 
 		repositoriesSvc: repositoriesSvc,
 		swarmSvc:        swarmSvc,
+		renderer:        renderer,
 
 		logger: logger,
 
@@ -334,13 +338,33 @@ func (s *Service) deploy(
 		return nil, fmt.Errorf("%w: compose path must point to a file", ErrValidationFailed)
 	}
 
+	composeForDeploy := composePath
+	rotationLogs := []string(nil)
+	if s.config.RotateImmutableResources {
+		renderedPath, rotated, renderErr := s.renderer.RenderVersionedCompose(req.StackName, composePath)
+		if renderErr != nil {
+			return nil, fmt.Errorf("failed to render versioned compose for immutable resources: %w", renderErr)
+		}
+		defer func() {
+			_ = os.Remove(renderedPath)
+		}()
+		composeForDeploy = renderedPath
+		rotationLogs = rotated
+	}
+
+	composeForDeploy, err = filepath.Rel(repositoryPath, composeForDeploy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relative compose path: %w", err)
+	}
+
 	env := flattenEnv(variables)
 	logs, err := s.swarmSvc.DeployStack(ctx, swarm.DeployStackRequest{
 		StackName:   req.StackName,
-		ComposePath: cleanComposePath,
+		ComposePath: composeForDeploy,
 		WorkDir:     repositoryPath,
 		Env:         env,
 	})
+	logs = append(logs, rotationLogs...)
 	if err != nil {
 		return logs, fmt.Errorf("failed to deploy stack: %w", err)
 	}

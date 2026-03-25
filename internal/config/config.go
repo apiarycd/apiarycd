@@ -58,7 +58,8 @@ type repositoriesConfig struct {
 }
 
 type deploymentsConfig struct {
-	DeployTimeout time.Duration `koanf:"deploy_timeout"`
+	DeployTimeout            time.Duration `koanf:"deploy_timeout"`
+	RotateImmutableResources bool          `koanf:"rotate_immutable_resources"`
 }
 
 type Config struct {
@@ -96,7 +97,8 @@ func Default() Config {
 		},
 
 		Deployments: deploymentsConfig{
-			DeployTimeout: 5 * time.Minute,
+			DeployTimeout:            5 * time.Minute,
+			RotateImmutableResources: false,
 		},
 	}
 }

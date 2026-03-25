@@ -25,5 +25,6 @@ repositories:
       username: ""
       password: "" # Personal access token for GitHub/GitLab
 
-example:
-  example: "example"
+deployments:
+  deploy_timeout: "5m"
+  rotate_immutable_resources: true

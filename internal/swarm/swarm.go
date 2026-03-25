@@ -53,6 +53,8 @@ func (s *Swarm) DeployStack(ctx context.Context, req DeployStackRequest) ([]stri
 		s.logger.Error(
 			"Failed to deploy Docker stack",
 			zap.String("name", req.StackName),
+			zap.String("work_dir", req.WorkDir),
+			zap.String("compose_path", req.ComposePath),
 			zap.String("output", strings.TrimSpace(string(output))),
 			zap.Error(err),
 		)
