@@ -95,9 +95,11 @@ func (s *Service) Clone(ctx context.Context, req CloneRequest) error {
 		return fmt.Errorf("failed to clone repository: %w", cloneErr)
 	}
 
-	// Verify target directory doesn't already exist to avoid overwrites
+	// Remove any existing target directory to allow re-clone
 	if _, statErr := os.Stat(dir); statErr == nil {
-		return fmt.Errorf("%w: target directory %q already exists", ErrCloneFailed, dir)
+		if rmErr := os.RemoveAll(dir); rmErr != nil {
+			return fmt.Errorf("failed to remove existing target directory: %w", rmErr)
+		}
 	} else if !os.IsNotExist(statErr) {
 		return fmt.Errorf("failed to check target directory: %w", statErr)
 	}

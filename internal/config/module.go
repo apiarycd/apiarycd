@@ -68,7 +68,8 @@ func Module() fx.Option {
 			},
 			func(cfg Config) deployments.Config {
 				return deployments.Config{
-					DeployTimeout: cfg.Deployments.DeployTimeout,
+					DeployTimeout:            cfg.Deployments.DeployTimeout,
+					RotateImmutableResources: cfg.Deployments.RotateImmutableResources,
 				}
 			},
 		),

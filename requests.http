@@ -12,9 +12,9 @@ Content-Type: application/json
 
 {
     "name": "Test",
-    "git_url": "https://github.com/MeneerHeijpaal/simple-nginx-docker-compose",
-    "git_branch": "main",
-    "compose_path": "docker-compose.yml"
+    "git_url": "https://github.com/apiarycd/demo-stack",
+    "git_branch": "master",
+    "compose_path": "compose.yml"
 }
 
 ###
@@ -26,9 +26,9 @@ PATCH {{apiURL}}/stacks/{{stackId}} HTTP/1.1
 Content-Type: application/json
 
 {
-    "git_url": "https://github.com/MeneerHeijpaal/simple-nginx-docker-compose",
-    "git_branch": "main",
-    "compose_path": "docker-compose.yml"
+    "git_url": "https://github.com/apiarycd/demo-stack",
+    "git_branch": "demo/config-changes",
+    "compose_path": "compose.yml"
 }
 
 ###
