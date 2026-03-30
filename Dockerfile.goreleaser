@@ -4,7 +4,7 @@ ARG TARGETPLATFORM
 ARG BINARY_NAME
 
 # Install certificates and timezone data
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata docker-cli
 
 # Create non-root user
 RUN addgroup -g 1000 appuser && \
