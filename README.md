@@ -29,8 +29,10 @@
   - [Built With](#built-with)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
+  - [Docker Daemon Runtime Requirements](#docker-daemon-runtime-requirements)
   - [Installation](#installation)
 - [Usage](#usage)
+  - [Recommended Docker Run Options](#recommended-docker-run-options)
 - [API Overview](#api-overview)
 - [Configuration](#configuration)
 - [Development](#development)
@@ -81,6 +83,13 @@ You should have these installed locally:
 * `golangci-lint` (for lint/format tasks)
 * `swag` (for Swagger generation)
 
+### Docker Daemon Runtime Requirements
+
+The application requires access to the Docker daemon for Swarm operations. Ensure the following:  
+1. Mount the Docker daemon socket: `-v /var/run/docker.sock:/var/run/docker.sock`
+2. Set `DOCKER_HOST` environment variable if using a remote daemon (e.g., `DOCKER_HOST=tcp://host:2376`)
+3. Grant `appuser` (UID 1000) read/write access to the Docker socket
+
 ### Installation
 
 1. Clone the repository.
@@ -107,6 +116,24 @@ You should have these installed locally:
 ## Usage
 
 By default, the API listens on `127.0.0.1:3000`.
+
+### Recommended Docker Run Options
+
+Choose one of the following to ensure `appuser` access to the Docker socket:
+
+1. **Match host Docker group GID** (preferred):
+   ```bash
+   docker run --group-add $(stat -c '%g' /var/run/docker.sock) -v /var/run/docker.sock:/var/run/docker.sock apiarycd/apiarycd:latest /app/server
+   ```
+2. **Run as root** (only if acceptable for your environment):
+   ```bash
+   docker run --user root -v /var/run/docker.sock:/var/run/docker.sock apiarycd/apiarycd:latest /app/server
+   ```
+3. **Chown Docker socket to appuser UID** (persistent host change):
+   ```bash
+   sudo chown 1000:1000 /var/run/docker.sock
+   docker run -v /var/run/docker.sock:/var/run/docker.sock apiarycd/apiarycd:latest /app/server
+   ```
 
 * Swagger UI: `http://127.0.0.1:3000/api/v1/docs`
 * Health endpoints:
