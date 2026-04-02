@@ -13,7 +13,7 @@ FROM alpine:3.22.2
 # Runtime dependencies:
 # - ca-certificates/tzdata for TLS and timezone handling
 # - docker-cli because the app shells out to `docker stack ...`
-RUN apk add --no-cache ca-certificates tzdata docker-cli
+RUN apk add --no-cache ca-certificates tzdata docker-cli git
 
 RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser --home /app appuser

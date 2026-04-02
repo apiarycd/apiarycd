@@ -43,7 +43,6 @@ type gitAuthConfig struct {
 
 type gitSSHAuthConfig struct {
 	PrivateKeyPath string `koanf:"private_key_path"`
-	Username       string `koanf:"username"`
 }
 
 type gitHTTPSAuthConfig struct {

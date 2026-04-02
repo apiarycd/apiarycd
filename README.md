@@ -30,6 +30,7 @@
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Docker Daemon Runtime Requirements](#docker-daemon-runtime-requirements)
+  - [Git Binary Requirement](#git-binary-requirement)
   - [Installation](#installation)
 - [Usage](#usage)
   - [Recommended Docker Run Options](#recommended-docker-run-options)
@@ -85,10 +86,14 @@ You should have these installed locally:
 
 ### Docker Daemon Runtime Requirements
 
-The application requires access to the Docker daemon for Swarm operations. Ensure the following:  
+The application requires access to the Docker daemon for Swarm operations. Ensure the following:
 1. Mount the Docker daemon socket: `-v /var/run/docker.sock:/var/run/docker.sock`
 2. Set `DOCKER_HOST` environment variable if using a remote daemon (e.g., `DOCKER_HOST=tcp://host:2376`)
 3. Grant `appuser` (UID 1000) read/write access to the Docker socket
+
+### Git Binary Requirement
+
+The application uses the `git` command-line tool for repository operations (clone, pull, etc.). The Docker images include Git by default. For bare-metal installations, ensure Git is installed and available in the system PATH.
 
 ### Installation
 
@@ -201,7 +206,6 @@ Top-level configuration keys:
   * `timeout`
   * `storage_dir`
   * `default_auth.ssh.private_key_path`
-  * `default_auth.ssh.username`
   * `default_auth.https.username`
   * `default_auth.https.password`
 * `deployments`
