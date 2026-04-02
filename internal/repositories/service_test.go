@@ -4,16 +4,13 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/apiarycd/apiarycd/internal/repositories"
-	"github.com/go-git/go-git/v6"
-	"github.com/go-git/go-git/v6/config"
-	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -87,49 +84,22 @@ func createBareRemote(t *testing.T) string {
 
 	baseDir := t.TempDir()
 	sourceDir := filepath.Join(baseDir, "source")
-	sourceRepo, err := git.PlainInit(sourceDir, false)
-	if err != nil {
-		t.Fatalf("failed to init source repo: %v", err)
-	}
+	runGit(t, "", "init", "--initial-branch=master", sourceDir)
+	runGit(t, sourceDir, "config", "user.email", "test@example.com")
+	runGit(t, sourceDir, "config", "user.name", "Test")
 
 	filePath := filepath.Join(sourceDir, "README.md")
 	if wrErr := os.WriteFile(filePath, []byte("hello\n"), 0600); wrErr != nil {
 		t.Fatalf("failed to write file: %v", wrErr)
 	}
 
-	worktree, err := sourceRepo.Worktree()
-	if err != nil {
-		t.Fatalf("failed to get source worktree: %v", err)
-	}
-
-	if _, addErr := worktree.Add("README.md"); addErr != nil {
-		t.Fatalf("failed to add file: %v", addErr)
-	}
-
-	if _, comErr := worktree.Commit("initial commit", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Test",
-			Email: "test@example.com",
-			When:  time.Now(),
-		},
-	}); comErr != nil {
-		t.Fatalf("failed to commit: %v", comErr)
-	}
+	runGit(t, sourceDir, "add", "README.md")
+	runGit(t, sourceDir, "commit", "-m", "initial commit")
 
 	remoteDir := filepath.Join(baseDir, "remote.git")
-	if _, initErr := git.PlainInit(remoteDir, true); initErr != nil {
-		t.Fatalf("failed to init bare remote: %v", initErr)
-	}
-
-	if _, remErr := sourceRepo.CreateRemote(
-		&config.RemoteConfig{Name: "origin", URLs: []string{remoteDir}},
-	); remErr != nil {
-		t.Fatalf("failed to create remote: %v", remErr)
-	}
-
-	if pushErr := sourceRepo.Push(&git.PushOptions{RemoteName: "origin"}); pushErr != nil {
-		t.Fatalf("failed to push to remote: %v", pushErr)
-	}
+	runGit(t, "", "init", "--bare", remoteDir)
+	runGit(t, sourceDir, "remote", "add", "origin", remoteDir)
+	runGit(t, sourceDir, "push", "origin", "HEAD")
 
 	return remoteDir
 }
@@ -238,52 +208,26 @@ func setupRemoteRepository(t *testing.T) string {
 	t.Helper()
 
 	remoteDir := filepath.Join(t.TempDir(), "remote.git")
-	_, err := git.PlainInit(remoteDir, true)
-	if err != nil {
-		t.Fatalf("PlainInit(remote, bare) error = %v", err)
-	}
+	runGit(t, "", "init", "--bare", remoteDir)
 
 	seedDir := filepath.Join(t.TempDir(), "seed")
-	repo, err := git.PlainInit(seedDir, false)
-	if err != nil {
-		t.Fatalf("PlainInit(seed) error = %v", err)
-	}
+	runGit(t, "", "init", "--initial-branch=master", seedDir)
+	runGit(t, seedDir, "config", "user.email", "test@example.com")
+	runGit(t, seedDir, "config", "user.name", "Test")
 
-	wt, err := repo.Worktree()
-	if err != nil {
-		t.Fatalf("Worktree() error = %v", err)
-	}
+	writeAndCommit(t, seedDir, "README.md", "base", "initial commit")
 
-	writeAndCommit(t, wt, seedDir, "README.md", "base", "initial commit")
+	runGit(t, seedDir, "checkout", "-b", "feature")
+	writeAndCommit(t, seedDir, "feature.txt", "feature", "feature commit")
 
-	if err = wt.Checkout(
-		&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("feature"), Create: true},
-	); err != nil {
-		t.Fatalf("Checkout(feature) error = %v", err)
-	}
-	writeAndCommit(t, wt, seedDir, "feature.txt", "feature", "feature commit")
-
-	if err = wt.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("master")}); err != nil {
-		t.Fatalf("Checkout(master) error = %v", err)
-	}
-
-	_, err = repo.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{remoteDir}})
-	if err != nil {
-		t.Fatalf("CreateRemote() error = %v", err)
-	}
-
-	err = repo.Push(&git.PushOptions{RemoteName: "origin", RefSpecs: []config.RefSpec{
-		"refs/heads/master:refs/heads/master",
-		"refs/heads/feature:refs/heads/feature",
-	}})
-	if err != nil {
-		t.Fatalf("Push() error = %v", err)
-	}
+	runGit(t, seedDir, "checkout", "master")
+	runGit(t, seedDir, "remote", "add", "origin", remoteDir)
+	runGit(t, seedDir, "push", "origin", "master", "feature")
 
 	return remoteDir
 }
 
-func writeAndCommit(t *testing.T, wt *git.Worktree, repoDir, fileName, contents, message string) {
+func writeAndCommit(t *testing.T, repoDir, fileName, contents, message string) {
 	t.Helper()
 
 	filePath := filepath.Join(repoDir, fileName)
@@ -291,29 +235,87 @@ func writeAndCommit(t *testing.T, wt *git.Worktree, repoDir, fileName, contents,
 		t.Fatalf("WriteFile(%s) error = %v", fileName, err)
 	}
 
-	if _, err := wt.Add(fileName); err != nil {
-		t.Fatalf("Add(%s) error = %v", fileName, err)
-	}
-
-	if _, err := wt.Commit(message, &git.CommitOptions{
-		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
-	}); err != nil {
-		t.Fatalf("Commit(%s) error = %v", message, err)
-	}
+	runGit(t, repoDir, "add", fileName)
+	runGit(t, repoDir, "commit", "-m", message)
 }
 
 func currentHeadBranch(t *testing.T, repoDir string) string {
 	t.Helper()
 
-	repo, err := git.PlainOpen(repoDir)
+	out := runGit(t, repoDir, "branch", "--show-current")
+	return strings.TrimSpace(out)
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("PlainOpen() error = %v", err)
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(out))
 	}
 
-	head, err := repo.Head()
-	if err != nil {
-		t.Fatalf("Head() error = %v", err)
+	return strings.TrimSpace(string(out))
+}
+
+func TestServiceGetDetails(t *testing.T) {
+	ctx := context.Background()
+	remoteURL := createBareRemote(t)
+	svc := newTestService(t)
+
+	repoID := uuid.New()
+	req := repositories.CloneRequest{ID: repoID, URL: remoteURL}
+
+	if err := svc.Clone(ctx, req); err != nil {
+		t.Fatalf("clone failed: %v", err)
 	}
 
-	return head.Name().Short()
+	details, err := svc.GetDetails(ctx, repoID)
+	if err != nil {
+		t.Fatalf("GetDetails failed: %v", err)
+	}
+
+	if details.Path == "" || details.Commit == "" || details.CommitMessage == "" {
+		t.Fatalf("unexpected details: %+v", details)
+	}
+
+	if !strings.Contains(details.CommitMessage, "initial commit") {
+		t.Fatalf("expected commit message to contain 'initial commit', got %q", details.CommitMessage)
+	}
+}
+
+func TestServiceBuildPath(t *testing.T) {
+	svc := newTestService(t)
+	id := uuid.MustParse("4f4f1a8f-0f18-4ad0-b90d-9474f5f5f85b")
+	path := svc.BuildPath(id)
+
+	if !strings.HasSuffix(path, id.String()) {
+		t.Fatalf("BuildPath() = %q, expected suffix %q", path, id.String())
+	}
+}
+
+func TestServiceDelete(t *testing.T) {
+	svc := newTestService(t)
+	id := uuid.New()
+	dir := svc.BuildPath(id)
+
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if err := svc.Delete(context.Background(), id); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected directory to be deleted, stat err = %v", err)
+	}
 }

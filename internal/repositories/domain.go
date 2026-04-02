@@ -2,14 +2,13 @@ package repositories
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-git/go-git/v6/plumbing/transport"
-	"github.com/go-git/go-git/v6/plumbing/transport/http"
-	gitssh "github.com/go-git/go-git/v6/plumbing/transport/ssh"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 )
 
 type GitAuth struct {
@@ -17,19 +16,27 @@ type GitAuth struct {
 	SSH   *GitSSHAuth
 }
 
-func (a GitAuth) BuildAuth() (transport.AuthMethod, bool, error) {
-	am, ok, err := a.SSH.BuildAuth()
+type GitCommandAuth struct {
+	Env         []string
+	URLOverride string
+}
+
+func (a GitAuth) BuildCommandAuth(rawURL string) (*GitCommandAuth, error) {
+	ca, err := a.SSH.BuildCommandAuth(rawURL)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	if ok {
-		return am, ok, nil
+	if ca != nil {
+		return ca, nil
 	}
 
-	am, ok = a.HTTPS.BuildAuth()
+	ca, err = a.HTTPS.BuildCommandAuth(rawURL)
+	if err != nil {
+		return nil, err
+	}
 
-	return am, ok, nil
+	return ca, nil
 }
 
 type GitHTTPSAuth struct {
@@ -37,45 +44,50 @@ type GitHTTPSAuth struct {
 	Password string `json:"-"`
 }
 
-func (a *GitHTTPSAuth) BuildAuth() (transport.AuthMethod, bool) {
-	if a == nil {
-		return nil, false
+func (a *GitHTTPSAuth) BuildCommandAuth(rawURL string) (*GitCommandAuth, error) {
+	if a == nil || a.Password == "" {
+		return nil, nil //nolint:nilnil // intentional
 	}
 
-	if a.Username != "" && a.Password != "" {
-		return &http.BasicAuth{
-			Username: a.Username,
-			Password: a.Password,
-		}, true
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse repository URL: %w", err)
 	}
 
-	if a.Password != "" {
-		// Token-based auth (GitHub/GitLab PATs): username is arbitrary
-		return &http.BasicAuth{
-			Username: "git",
-			Password: a.Password,
-		}, true
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, nil //nolint:nilnil // intentional
 	}
 
-	return nil, false
+	username := lo.CoalesceOrEmpty(
+		parsed.User.Username(),
+		a.Username,
+		"git",
+	)
+
+	password, ok := parsed.User.Password()
+	if !ok {
+		password = a.Password
+	}
+
+	parsed.User = url.UserPassword(username, password)
+
+	return &GitCommandAuth{Env: []string{}, URLOverride: parsed.String()}, nil
 }
 
 type GitSSHAuth struct {
 	PrivateKeyPath string
-	Username       string
-	Password       string `json:"-"`
 }
 
-func (c *GitSSHAuth) Validate() error {
-	if c == nil {
+func (a *GitSSHAuth) Validate() error {
+	if a == nil {
 		return nil
 	}
 
-	if c.PrivateKeyPath == "" {
+	if a.PrivateKeyPath == "" {
 		return nil
 	}
 
-	keyPath, err := expandHome(c.PrivateKeyPath)
+	keyPath, err := expandHome(a.PrivateKeyPath)
 	if err != nil {
 		return err
 	}
@@ -87,31 +99,23 @@ func (c *GitSSHAuth) Validate() error {
 	return nil
 }
 
-func (c *GitSSHAuth) BuildAuth() (transport.AuthMethod, bool, error) {
-	if c == nil {
-		return nil, false, nil
+func (a *GitSSHAuth) BuildCommandAuth(rawURL string) (*GitCommandAuth, error) {
+	if a == nil || a.PrivateKeyPath == "" {
+		return nil, nil //nolint:nilnil // intentional
 	}
 
-	if c.PrivateKeyPath == "" {
-		return nil, false, nil
+	if parsed, err := url.Parse(rawURL); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+		return nil, nil //nolint:nilnil // intentional
 	}
 
-	username := "git"
-	if c.Username != "" {
-		username = c.Username
-	}
-
-	keyPath, err := expandHome(c.PrivateKeyPath)
+	keyPath, err := expandHome(a.PrivateKeyPath)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	keys, err := gitssh.NewPublicKeysFromFile(username, keyPath, c.Password)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to build SSH auth: %w", err)
-	}
+	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -i %s", shellEscapeArg(keyPath))
 
-	return keys, true, nil
+	return &GitCommandAuth{Env: []string{"GIT_SSH_COMMAND=" + sshCmd}, URLOverride: ""}, nil
 }
 
 // CloneRequest represents the request to clone a repository.
@@ -124,6 +128,14 @@ type CloneRequest struct {
 
 type PullRequest CloneRequest
 
+type Details struct {
+	Path          string
+	Branch        string
+	Tag           string
+	Commit        string
+	CommitMessage string
+}
+
 func expandHome(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()
@@ -135,10 +147,10 @@ func expandHome(path string) (string, error) {
 	return path, nil
 }
 
-type Details struct {
-	Path          string
-	Branch        string
-	Tag           string
-	Commit        string
-	CommitMessage string
+func shellEscapeArg(input string) string {
+	if input == "" {
+		return "''"
+	}
+
+	return "'" + strings.ReplaceAll(input, "'", "'\\''") + "'"
 }
